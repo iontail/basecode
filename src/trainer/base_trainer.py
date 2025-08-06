@@ -1,304 +1,402 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple
-import math
+from typing import Any, Dict, Optional, Tuple, Union
 import os
+import math
 import torch
-from torch import nn
+import torch.nn as nn
+from torch.optim import Adam, AdamW, SGD, RMSprop
+from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, ReduceLROnPlateau, ExponentialLR, CosineAnnealingWarmRestarts
+
 from contextlib import nullcontext
 from tqdm.auto import tqdm
+import random
+import numpy as np
+import wandb
 
-MiB = 1024 ** 2
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    TENSORBOARD_AVAILABLE = False
 
-def model_size_b(model: nn.Module) -> int:
-    size = 0
-    for p in model.parameters(): size += p.nelement() * p.element_size()
-    for b in model.buffers():    size += b.nelement() * b.element_size()
-    return size
-
-# -------------------- EMA (선택) --------------------
-class EMA:
-    def __init__(self, model: nn.Module, decay: float = 0.999):
-        self.shadow = {}
-        self.decay = decay
-        for n, p in model.named_parameters():
-            if p.requires_grad:
-                self.shadow[n] = p.detach().clone()
-
-    @torch.no_grad()
-    def update(self, model: nn.Module):
-        for (n, p) in model.named_parameters():
-            if p.requires_grad:
-                self.shadow[n].mul_(self.decay).add_(p.detach(), alpha=1 - self.decay)
-
-    @torch.no_grad()
-    def apply_to(self, model: nn.Module):
-        self._backup = {}
-        for (n, p) in model.named_parameters():
-            if p.requires_grad:
-                self._backup[n] = p.detach().clone()
-                p.data.copy_(self.shadow[n].data)
-
-    @torch.no_grad()
-    def restore(self, model: nn.Module):
-        for (n, p) in model.named_parameters():
-            if p.requires_grad and n in self._backup:
-                p.data.copy_(self._backup[n].data)
-        self._backup = {}
-
-# -------------------- EarlyStopping --------------------
 class EarlyStopping:
-    def __init__(self, patience: int, min_delta: float = 0.0, mode: str = "min"):
+    """Early stopping utility to stop training when validation metric stops improving."""
+    
+    def __init__(self, patience: int = 10, min_delta: float = 0.0, mode: str = "min"):
         self.patience = patience
         self.min_delta = min_delta
         self.mode = mode
-        self.best = None
-        self.count = 0
-
-    def better(self, curr: float, best: float) -> bool:
+        self.best_metric = None
+        self.counter = 0
+        self.early_stop = False
+    
+    def __call__(self, metric: float) -> bool:
+        if self.best_metric is None:
+            self.best_metric = metric
+        elif self._is_better(metric):
+            self.best_metric = metric
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        
+        return self.early_stop
+    
+    def _is_better(self, metric: float) -> bool:
         if self.mode == "min":
-            return curr < best - self.min_delta
+            return metric < self.best_metric - self.min_delta
         else:
-            return curr > best + self.min_delta
+            return metric > self.best_metric + self.min_delta
 
-    def step(self, curr: float) -> bool:
-        if self.best is None:
-            self.best = curr
-            return False
-        if self.better(curr, self.best):
-            self.best = curr
-            self.count = 0
-            return False
-        else:
-            self.count += 1
-            return self.count > self.patience
 
-# -------------------- Trainer --------------------
-class Trainer(ABC):
-    def __init__(self, model: nn.Module):
+class BaseTrainer(ABC):
+    """Abstract base trainer class that integrates with arguments and config system."""
+    
+    def __init__(self, model: nn.Module, args):
         self.model = model
-        self.scaler: Optional[torch.cuda.amp.GradScaler] = None
-        self.ema: Optional[EMA] = None
-        self.best_metric: Optional[float] = None
-        self.best_ckpt_path: Optional[str] = None
-        self.mode: str = "min"  # or "max" for metric comparison
-
-    # ----- 반드시 서브클래스가 구현 -----
-    @abstractmethod
-    def get_train_loss(self, **kwargs) -> torch.Tensor:
-        ...
-
-    @abstractmethod
-    def get_optimizer(self, lr: float):
-        ...
-
-    @abstractmethod
-    def get_scheduler(self, optimizer):
-        ...
-
-    @abstractmethod
-    def validate(self, **kwargs) -> Dict[str, float]:
-        """검증 단계. 반환 예: {'val_loss': 0.123, 'acc': 0.9}"""
-        ...
-
-    # ----- 환경/정밀도 -----
-    def set_seed(self, seed: int):
-        import random, numpy as np
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = False
-        torch.backends.cudnn.benchmark = True  # 성능 우선
-
-    def select_device(self, device_str: str) -> torch.device:
-        if device_str == "auto":
-            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.device(device_str)
-
-    def setup_precision(self, precision: str = "fp32"):
-        """
-        precision: 'fp32' | 'amp' | 'bf16'
-        Returns: (autocast_context, scaler_or_None)
-        """
-        if precision == "amp":
+        self.args = args
+        self.device = self._setup_device()
+        self.model.to(self.device)
+        
+        # Training components
+        self.optimizer = None
+        self.scheduler = None
+        self.criterion = None
+        self.scaler = None
+        
+        # Tracking variables
+        self.current_epoch = 0
+        self.global_step = 0
+        self.best_metric = None
+        self.best_model_path = None
+        
+        # Setup training environment
+        self._setup_reproducibility()
+        self._setup_precision()
+        self._setup_logging()
+        self._setup_early_stopping()
+        
+        # Create save directories
+        os.makedirs(args.save_dir, exist_ok=True)
+        os.makedirs(args.log_dir, exist_ok=True)
+    
+    def _setup_device(self) -> torch.device:
+        """Setup device based on arguments."""
+        if self.args.device == 'auto':
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                device = torch.device('mps')
+            else:
+                device = torch.device('cpu')
+        else:
+            device = torch.device(self.args.device)
+        
+        print(f"Using device: {device}")
+        return device
+    
+    def _setup_reproducibility(self):
+        """Setup random seeds for reproducibility."""
+        if self.args.seed is not None:
+            random.seed(self.args.seed)
+            np.random.seed(self.args.seed)
+            torch.manual_seed(self.args.seed)
+            torch.cuda.manual_seed_all(self.args.seed)
+            
+            if self.args.deterministic:
+                torch.backends.cudnn.deterministic = True
+                torch.backends.cudnn.benchmark = False
+            else:
+                torch.backends.cudnn.benchmark = True
+    
+    def _setup_precision(self):
+        """Setup mixed precision training if enabled."""
+        if self.args.mixed_precision and self.device.type == 'cuda':
             self.scaler = torch.cuda.amp.GradScaler()
-            autocast_ctx = torch.cuda.amp.autocast
-        elif precision == "bf16":
-            self.scaler = None
-            autocast_ctx = lambda: torch.cuda.amp.autocast(dtype=torch.bfloat16)
+            self.autocast_context = torch.cuda.amp.autocast
         else:
             self.scaler = None
-            autocast_ctx = nullcontext
-        return autocast_ctx
-
-    def maybe_compile_model(self, use_compile: bool, **kwargs):
-        if use_compile and hasattr(torch, "compile"):
-            self.model = torch.compile(self.model, **kwargs)
-
-    # ----- 보고/로그 -----
-    def param_count(self, trainable_only: bool = False) -> int:
-        if trainable_only:
-            return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        return sum(p.numel() for p in self.model.parameters())
-
-    def log_model_footprint(self):
-        size_mb = model_size_b(self.model) / MiB
-        n_all = self.param_count(False)
-        n_trn = self.param_count(True)
-        print(f"Model: {size_mb:.2f} MiB | params: {n_all:,} (trainable: {n_trn:,})")
-
-    # ----- 스케줄러 -----
-    def step_scheduler(self, scheduler, metric: Optional[float] = None):
-        if scheduler is None: 
-            return
-        # ReduceLROnPlateau는 metric 필요
-        if scheduler.__class__.__name__.lower().startswith("reducelronplateau"):
-            if metric is not None:
-                scheduler.step(metric)
+            self.autocast_context = nullcontext
+    
+    def _setup_logging(self):
+        """Setup logging utilities (W&B, TensorBoard)."""
+        self.wandb_logger = None
+        self.tb_logger = None
+        
+        if self.args.use_wandb:
+            wandb.init(
+                project=self.args.wandb_project,
+                entity=self.args.wandb_entity,
+                name=self.args.experiment_name,
+                config=vars(self.args)
+            )
+            self.wandb_logger = wandb
+        
+        if self.args.use_tensorboard and TENSORBOARD_AVAILABLE:
+            log_path = os.path.join(self.args.log_dir, self.args.experiment_name)
+            self.tb_logger = SummaryWriter(log_path)
+    
+    def _setup_early_stopping(self):
+        """Setup early stopping if enabled."""
+        if self.args.early_stopping:
+            self.early_stopper = EarlyStopping(
+                patience=self.args.patience,
+                min_delta=self.args.min_delta,
+                mode="min"  # Assuming we want to minimize validation loss
+            )
         else:
-            scheduler.step()
-
-    # ----- 체크포인트 -----
-    def save_checkpoint(self, path: str, optimizer, scheduler=None, extra: Optional[Dict]=None):
-        state = {
-            "model": self.model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict() if scheduler else None,
-            "scaler": self.scaler.state_dict() if self.scaler else None,
-            "extra": extra or {},
+            self.early_stopper = None
+    
+    def get_optimizer(self) -> torch.optim.Optimizer:
+        """Create optimizer based on arguments."""
+        params = self.model.parameters()
+        
+        if self.args.optimizer == 'Adam':
+            optimizer = Adam(
+                params,
+                lr=self.args.lr,
+                weight_decay=self.args.weight_decay
+            )
+        elif self.args.optimizer == 'AdamW':
+            optimizer = AdamW(
+                params,
+                lr=self.args.lr,
+                weight_decay=self.args.weight_decay
+            )
+        elif self.args.optimizer == 'SGD':
+            optimizer = SGD(
+                params,
+                lr=self.args.lr,
+                momentum=self.args.momentum,
+                weight_decay=self.args.weight_decay
+            )
+        elif self.args.optimizer == 'RMSprop':
+            optimizer = RMSprop(
+                params,
+                lr=self.args.lr,
+                weight_decay=self.args.weight_decay
+            )
+        else:
+            raise ValueError(f"Unsupported optimizer: {self.args.optimizer}")
+        
+        return optimizer
+    
+    # 여기부분 config.py에서 불러와서 사용하도록 수정해야함
+    def get_scheduler(self, optimizer) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+        """Create learning rate scheduler based on arguments."""
+        if self.args.scheduler == 'none':
+            return None
+        elif self.args.scheduler == 'cosine':
+            return CosineAnnealingLR(
+                optimizer,
+                T_max=self.args.epochs,
+                eta_min=self.args.min_lr
+            )
+        elif self.args.scheduler == 'step':
+            return StepLR(
+                optimizer,
+                step_size=self.args.epochs // 3,
+                gamma=0.1
+            )
+        elif self.args.scheduler == 'plateau':
+            return ReduceLROnPlateau(
+                optimizer,
+                mode='min',
+                patience=10,
+                factor=0.1
+            )
+        elif self.args.scheduler == 'exponential':
+            return ExponentialLR(optimizer, gamma=0.95)
+        else:
+            raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
+    
+    
+    def save_checkpoint(self, filepath: str, is_best: bool = False):
+        """Save model checkpoint."""
+        checkpoint = {
+            'epoch': self.current_epoch,
+            'global_step': self.global_step,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
+            'scaler_state_dict': self.scaler.state_dict() if self.scaler else None,
+            'best_metric': self.best_metric,
+            'args': self.args
         }
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        torch.save(state, path)
+        
+        torch.save(checkpoint, filepath)
+        
+        if is_best:
+            best_path = os.path.join(self.args.save_dir, 'best_model.pt')
+            torch.save(checkpoint, best_path)
+            self.best_model_path = best_path
+    
+    def load_checkpoint(self, filepath: str, load_optimizer: bool = True):
+        """Load model checkpoint."""
+        checkpoint = torch.load(filepath, map_location=self.device)
+        
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        
+        if load_optimizer and self.optimizer:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        if self.scheduler and checkpoint.get('scheduler_state_dict'):
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
+        if self.scaler and checkpoint.get('scaler_state_dict'):
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+        
+        self.current_epoch = checkpoint.get('epoch', 0)
+        self.global_step = checkpoint.get('global_step', 0)
+        self.best_metric = checkpoint.get('best_metric', None)
+        
+        print(f"Loaded checkpoint from {filepath}")
+        return checkpoint
+    
+    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
+        """Log metrics to various loggers."""
+        if step is None:
+            step = self.global_step
+        
+        # Console logging
+        if step % self.args.print_freq == 0:
+            metric_str = ' | '.join([f'{k}: {v:.4f}' for k, v in metrics.items()])
+            print(f"Step {step} | {metric_str}")
+        
+        # W&B logging
+        if self.wandb_logger:
+            self.wandb_logger.log(metrics, step=step)
+        
+        # TensorBoard logging
+        if self.tb_logger:
+            for name, value in metrics.items():
+                self.tb_logger.add_scalar(name, value, step)
+    
+    def model_size_b(self) -> int:
+        """
+        Returns model size in bytes. Based on https://discuss.pytorch.org/t/finding-model-size/130275/2
+        Args:
+        - model: self-explanatory
+        Returns:
+        - size: model size in bytes
+        """
+        size = 0
+        for param in self.model.parameters():
+            size += param.nelement() * param.element_size()
+        for buf in self.model.buffers():
+            size += buf.nelement() * buf.element_size()
+        return size
+    
+    def model_summary(self):
+        """Print model summary."""
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        model_size_bytes = self.model_size_b()
+        model_size_mb = model_size_bytes / (1024 ** 2) # MiB = 1024 * 1024 bytes
+        
+        print(f"Model Summary:")
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Model size: {model_size_mb:.2f} MiB ({model_size_bytes:,} bytes)")
 
-    def load_checkpoint(self, path: str, optimizer=None, scheduler=None, strict: bool = True):
-        ckpt = torch.load(path, map_location="cpu")
-        self.model.load_state_dict(ckpt["model"], strict=strict)
-        if optimizer and ckpt.get("optimizer"):
-            optimizer.load_state_dict(ckpt["optimizer"])
-        if scheduler and ckpt.get("scheduler"):
-            scheduler.load_state_dict(ckpt["scheduler"])
-        if self.scaler and ckpt.get("scaler"):
-            self.scaler.load_state_dict(ckpt["scaler"])
-        return ckpt.get("extra", {})
-
-    def is_better(self, curr: float, best: Optional[float], mode: str = "min") -> bool:
-        if best is None:
-            return True
-        return (curr < best) if mode == "min" else (curr > best)
-
-    # ----- 메인 루프 -----
-    def train(
-        self,
-        num_epochs: int,
-        device: torch.device,
-        lr: float = 1e-3,
-        precision: str = "fp32",
-        accum_steps: int = 1,
-        grad_clip: Optional[float] = None,
-        scheduler_mode_metric: str = "val_loss",
-        early_stop_patience: Optional[int] = None,
-        early_stop_delta: float = 0.0,
-        metric_mode: str = "min",
-        ema_decay: Optional[float] = None,
-        save_dir: str = "./checkpoints",
-        save_best: bool = True,
-        resume_path: Optional[str] = None,
-        use_compile: bool = False,
-        compile_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ):
-        self.mode = metric_mode
-        self.model.to(device)
-        self.maybe_compile_model(use_compile, **(compile_kwargs or {}))
-
-        # 리포트
-        self.log_model_footprint()
-
-        # 옵티마/스케줄러
-        opt = self.get_optimizer(lr)
-        sch = self.get_scheduler(opt)
-
-        # AMP/bf16
-        autocast_ctx = self.setup_precision(precision)
-
-        # EMA
-        if ema_decay:
-            self.ema = EMA(self.model, decay=ema_decay)
-
-        # 재개
-        if resume_path:
-            self.load_checkpoint(resume_path, optimizer=opt, scheduler=sch, strict=False)
-            print(f"Resumed from {resume_path}")
-
-        # 얼리 스톱
-        stopper = EarlyStopping(early_stop_patience, early_stop_delta, mode=metric_mode) if early_stop_patience else None
-
-        self.model.train()
-        global_step = 0
-        best_metric_name = scheduler_mode_metric
-        os.makedirs(save_dir, exist_ok=True)
-
-        for epoch in range(1, num_epochs + 1):
-            pbar = tqdm(range(1), desc=f"Epoch {epoch}/{num_epochs}")
-            running_loss = 0.0
-
-            for _ in pbar:
-                with autocast_ctx():
-                    loss = self.get_train_loss(**kwargs) / accum_steps
-
-                if self.scaler:
-                    self.scaler.scale(loss).backward()
+    def cleanup(self):
+        """Cleanup resources."""
+        if self.wandb_logger:
+            wandb.finish()
+        if self.tb_logger:
+            self.tb_logger.close()
+    
+    def train(self):
+        """Main training loop."""
+        # Initialize training components
+        self.optimizer = self.get_optimizer()
+        self.scheduler = self.get_scheduler(self.optimizer)
+        self.criterion = self.get_criterion()
+        
+        # Resume from checkpoint if specified
+        if self.args.resume:
+            self.load_checkpoint(self.args.resume)
+        
+        # Print model summary
+        if not self.args.debug:
+            self.model_summary()
+        
+        # Compile model if requested (PyTorch 2.0+)
+        if self.args.compile and hasattr(torch, 'compile'):
+            self.model = torch.compile(self.model)
+        
+        print(f"Starting training for {self.args.epochs} epochs...")
+        
+        for epoch in range(self.current_epoch, self.args.epochs):
+            self.current_epoch = epoch
+            
+            # Training phase
+            train_metrics = self.train_epoch()
+            
+            # Validation phase
+            if epoch % self.args.eval_freq == 0:
+                val_metrics = self.validate_epoch()
+            else:
+                val_metrics = {}
+            
+            # Combine metrics
+            all_metrics = {**train_metrics, **val_metrics}
+            
+            # Log metrics
+            self.log_metrics(all_metrics)
+            
+            # Update scheduler
+            if self.scheduler:
+                if isinstance(self.scheduler, ReduceLROnPlateau):
+                    if 'val_loss' in val_metrics:
+                        self.scheduler.step(val_metrics['val_loss'])
                 else:
-                    loss.backward()
-
-                # Accumulation
-                if (global_step + 1) % accum_steps == 0:
-                    if grad_clip:
-                        if self.scaler:
-                            self.scaler.unscale_(opt)
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=grad_clip)
-
-                    if self.scaler:
-                        self.scaler.step(opt)
-                        self.scaler.update()
-                    else:
-                        opt.step()
-                    opt.zero_grad(set_to_none=True)
-
-                    # EMA 업데이트
-                    if self.ema:
-                        self.ema.update(self.model)
-
-                running_loss += loss.item() * accum_steps
-                global_step += 1
-                pbar.set_postfix({"loss": f"{(running_loss):.4f}"})
-
-            # ---- Epoch 끝: 검증 → 스케줄러/체크포인트 ----
-            val_stats = self.validate(**kwargs)  # {'val_loss':..., 'acc':...}
-            val_metric = val_stats.get(best_metric_name)
-            self.step_scheduler(sch, metric=val_metric)
-
-            # 베스트 저장/얼리 스탑
-            if save_best and val_metric is not None:
-                if self.is_better(val_metric, self.best_metric, mode=metric_mode):
-                    self.best_metric = val_metric
-                    self.best_ckpt_path = os.path.join(save_dir, "best.pt")
-                    self.save_checkpoint(self.best_ckpt_path, opt, sch, extra={"epoch": epoch, "val": val_stats})
-                    print(f"[Best] {best_metric_name}={val_metric:.4f} → saved: {self.best_ckpt_path}")
-
-            # 마지막 에폭 저장(선택)
-            last_ckpt = os.path.join(save_dir, "last.pt")
-            self.save_checkpoint(last_ckpt, opt, sch, extra={"epoch": epoch, "val": val_stats})
-
-            if stopper and val_metric is not None:
-                if stopper.step(val_metric):
-                    print(f"Early stopping at epoch {epoch}. Best {best_metric_name}={stopper.best:.4f}")
+                    self.scheduler.step()
+            
+            # Save checkpoints
+            if self.args.save_last:
+                last_path = os.path.join(self.args.save_dir, 'last_checkpoint.pt')
+                self.save_checkpoint(last_path)
+            
+            # Save best model
+            if self.args.save_best and 'val_loss' in val_metrics:
+                is_best = (self.best_metric is None or 
+                          val_metrics['val_loss'] < self.best_metric)
+                if is_best:
+                    self.best_metric = val_metrics['val_loss']
+                    self.save_checkpoint(
+                        os.path.join(self.args.save_dir, f'best_epoch_{epoch}.pt'), 
+                        is_best=True
+                    )
+            
+            # Early stopping
+            if self.early_stopper and 'val_loss' in val_metrics:
+                if self.early_stopper(val_metrics['val_loss']):
+                    print(f"Early stopping triggered at epoch {epoch}")
                     break
-
-        # EMA 가중치로 최종 평가가 필요하면 아래 활용
-        # if self.ema:
-        #     self.ema.apply_to(self.model)
-        #     _ = self.validate(**kwargs)
-        #     self.ema.restore(self.model)
-
-        self.model.eval()
+        
+        print("Training completed!")
+        self.cleanup()
+    
+    # Abstract methods that must be implemented by subclasses
+        
+    @abstractmethod
+    def get_criterion(self) -> nn.Module:
+        """Create loss criterion. Should be implemented by subclass if needed."""
+        pass
+    
+    @abstractmethod
+    def train_epoch(self) -> Dict[str, float]:
+        """Train for one epoch. Must return dict of metrics."""
+        pass
+    
+    @abstractmethod
+    def validate_epoch(self) -> Dict[str, float]:
+        """Validate for one epoch. Must return dict of metrics."""
+        pass
+    
+    @abstractmethod
+    def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass. Must return (loss, predictions)."""
+        pass
