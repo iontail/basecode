@@ -1,0 +1,6 @@
+__pycache__
+data/
+logs/
+checkpoints/
+*.pt
+*.pth
