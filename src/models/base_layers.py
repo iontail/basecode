@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 
+"""
+This module contains custom convolutional and linear layers
+that automatically handle input shape transpositions.
+"""
 class conv1dBLC(nn.Conv1d):
     """
     Automatically transposes input of shape (B, L, C) to (B, C, L) if needed.

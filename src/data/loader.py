@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from .dataset import ImageDataset
-from .mapping import get_label_map, get_image_label_list
-from .collator import default_collate_fn
+from .utils import collect_image_paths
+from .collate import collate_fn
 
 
 def create_dataloader(
@@ -13,24 +13,34 @@ def create_dataloader(
     shuffle: bool = True,
     num_workers: int = 4,
     image_size: int = 224,
-    collate_fn = default_collate_fn
+    normalize: bool = True
 ) -> DataLoader:
-
-    label_map = get_label_map(data_dir)
-    image_label_list = get_image_label_list(data_dir, label_map)
-
-    transform = transforms.Compose([
+    """Create DataLoader for image classification."""
+    
+    # Collect all image paths with labels
+    image_paths = collect_image_paths(data_dir)
+    
+    # ============================
+    # Define transforms
+    # or fill custom transformations in dataset.py
+    # ============================
+    transform_list = [
         transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
-    ])
-
-    dataset = ImageDataset(image_label_list, transform=transform)
-
+        transforms.ToTensor()
+    ]
+    
+    if normalize:
+        transform_list.append(transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
+    
+    transform = transforms.Compose(transform_list)
+    
+    # Create dataset
+    dataset = ImageDataset(image_paths, transform=transform)
+    
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        collate_fn=collate_fn  # 여기 주의
+        collate_fn=collate_fn
     )
