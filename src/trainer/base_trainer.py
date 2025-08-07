@@ -400,3 +400,8 @@ class BaseTrainer(ABC):
     def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass. Must return (loss, predictions)."""
         pass
+    
+    @abstractmethod
+    def inference(self, batch) -> torch.Tensor:
+        """Run inference on a batch. Should be implemented by subclass if needed."""
+        pass
