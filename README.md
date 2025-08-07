@@ -1,7 +1,7 @@
 # 🧠 Research Base Template
 
 > A modular and extensible codebase for deep learning research.  
-> Easily adaptable for classification, detection, or multimodal tasks.
+> Easily adaptable for various tasks
 
 This repository provides a clean and reusable foundation for a wide range of research projects in computer vision, audio, and multimodal learning.  
 It is designed to support **rapid prototyping**, **structured experimentation**, and **modular customization**.
@@ -14,18 +14,19 @@ Organize the folders as:
 
 ```
 .
-├── config/              # YAML or Python configs for each experiment
+├── config/              # Python configs for each experiment
 │   └── config.py
 ├── src/                 # Core logic
-│   ├── data/            # Dataset, collators, transforms
+│   ├── data/            # Dataset, collators, transforms, dataloader
 │   │   ├── dataset.py
 │   │   ├── loader.py
+│   │   ├── mapping.py   # label mapping
 │   │   └── collator.py
-│   ├── models/          # Model definitions
+│   ├── models/          # Model definitions 
 │   │   └── model.py
-│   ├── trainer/         # Training and evaluation logic
+│   ├── trainer/         # Training and evaluation logic based on trainer
 │   │   ├── basetrainer.py
-│   │   └── maintrainer.py
+│   │   └── maintrainer.py # define your own Trainer based on basetrainer.py
 ├── utils/               # Common utilities (logging, metrics, etc.)
 │   └── logger.py
 ├── weights/             # Pretrained weights or checkpoints
