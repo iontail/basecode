@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from .dataset import ImageDataset
-from .utils import get_label_map, get_image_label_list
+from .mapping import get_label_map, get_image_label_list
 from .collator import default_collate_fn
 
 
