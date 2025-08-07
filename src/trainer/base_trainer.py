@@ -317,10 +317,11 @@ class BaseTrainer(ABC):
         # Resume from checkpoint if specified
         if self.args.resume:
             self.load_checkpoint(self.args.resume)
-        
+
         # Print model summary
-        if not self.args.debug:
-            self.model_summary()
+        self.model_summary()
+        
+        
         
         # Compile model if requested (PyTorch 2.0+)
         if self.args.compile and hasattr(torch, 'compile'):

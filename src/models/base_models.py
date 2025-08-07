@@ -14,7 +14,6 @@ class BaseModel(nn.Module, ABC):
     def __init__(self, *args, **kwargs):
         super(BaseModel, self).__init__(*args, **kwargs)
 
-    
     @abstractmethod
     @property
     def dim(self) -> int:
@@ -65,4 +64,31 @@ class BaseModel(nn.Module, ABC):
                 if any(layer_name in name for layer_name in layer_names):
                     param.requires_grad = True
         return self
+    
+    def model_size_b(self) -> int:
+        """
+        Returns model size in bytes. Based on https://discuss.pytorch.org/t/finding-model-size/130275/2
+        Args:
+        - model: self-explanatory
+        Returns:
+        - size: model size in bytes
+        """
+        size = 0
+        for param in self.model.parameters():
+            size += param.nelement() * param.element_size()
+        for buf in self.model.buffers():
+            size += buf.nelement() * buf.element_size()
+        return size
+    
+    def model_summary(self):
+        """Print model summary."""
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        model_size_bytes = self.model_size_b()
+        model_size_mb = model_size_bytes / (1024 ** 2) # MiB = 1024 * 1024 bytes
+        
+        print(f"Model Summary:")
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Model size: {model_size_mb:.2f} MiB ({model_size_bytes:,} bytes)")
     

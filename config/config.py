@@ -39,7 +39,7 @@ def get_scheduler_config(name, args):
 
     return cfg.scheduler_configs.get(name, None)
 
-def get_augmentation_config(name='basic', args):
+def get_augmentation_config(name, args):
 
     # Augmentation configurations
     cfg.augmentation_configs = edict({

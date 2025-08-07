@@ -4,7 +4,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 
-class ImageDataset(Dataset):
+class CustomDataset(Dataset):
     """Image dataset for classification tasks."""
     
     def __init__(
