@@ -27,16 +27,16 @@ Organize the folders as:
 │   ├── trainer/         # Training and evaluation logic based on trainer
 │   │   ├── basetrainer.py
 │   │   └── maintrainer.py # define your own Trainer based on basetrainer.py
-├── utils/               # Common utilities (logging, metrics, etc.)
-│   └── logger.py
-├── weights/             # Pretrained weights or checkpoints
-│   └── decomp.pth
+│   └── utils/               # Common utilities (logging, metrics, etc.)
+|
 ├── dataset/             # Dataset files or symbolic links
 │   ├── train.txt
 │   ├── val.txt
 │   └── YourDataset/
 │       ├── classA/
 │       └── classB/
+├── checkpoints/         # Auto-generated when training
+├── log/                 # Auto-generated when running arguments.py or related code
 ├── train.py             # Entry point for training
 ├── test.py              # Entry point for evaluation
 ├── arguments.py         # Command-line argument parser
@@ -52,14 +52,14 @@ Begin by cloning the repository and setting up the environment:
 
 ```bash
 git clone https://github.com/yourname/research-base-template.git
-cd research-base-template
+cd [your directory]
 
 # Create and activate conda environment
-conda create -y -n research-env python=3.8
-conda activate research-env
+conda create -y -n basecode python=3.12
+conda activate basecode
 
 # Install dependencies
-pip install torch==1.13.1 torchvision==0.14.1 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
@@ -107,25 +107,12 @@ python test.py --weights ./weights/your_model.pth
 
 ---
 
-## 🧪 Example Use Cases
-
-This base code has been used in:
-
-- Image classification (e.g., Food11, CIFAR-10)
-- Domain adaptation (e.g., BRNet-style lighting adaptation)
-- Audio classification (e.g., emotion detection)
-- Bias mitigation & multimodal alignment
-
----
-
 ## 🛠️ Todo (Optional)
 
-- [ ] Add `src/metrics/` for custom evaluation
-- [ ] Add `src/hooks/` for training callbacks
-- [ ] Add WandB/CometML logger
+- [ ] modify `src/trainer/basetrainer.py` for custom trainer
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+This project is open to everyone for research purposes.
