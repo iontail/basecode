@@ -5,8 +5,6 @@ from torch.utils.data import Dataset
 
 
 class CustomDataset(Dataset):
-    """Image dataset for classification tasks."""
-    
     def __init__(
         self, 
         image_paths: List[Tuple[Path, int]], 
@@ -21,13 +19,7 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict:
         img_path, label = self.image_paths[idx]
         
-        # Load and convert image
         image = Image.open(img_path).convert("RGB")
-
-        # ============================
-        # Apply transformations if any
-        # ============================
-
         
         if self.transform:
             image = self.transform(image)

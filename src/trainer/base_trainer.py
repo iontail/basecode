@@ -12,37 +12,28 @@ import numpy as np
 
 
 class BaseTrainer(ABC):
-    """Abstract base trainer class that integrates with arguments and config system."""
-    
     def __init__(self, model: nn.Module, args, train_loader=None, val_loader=None, test_loader=None):
         self.model = model
         self.args = args
         self.device = self._setup_device()
         self.model.to(self.device)
         
-        # Data loaders
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
         
-        # Training components
         self.optimizer = None
         self.scheduler = None
         self.criterion = None
         
-        # Tracking variables
         self.current_epoch = 0
         self.best_metric = None
         self.best_model_path = None
         
-        # Setup training environment
         self._setup_reproducibility()
-        
-        # Create save directories
         os.makedirs(args.save_dir, exist_ok=True)
     
     def _setup_device(self) -> torch.device:
-        """Setup device based on arguments."""
         if self.args.device == 'auto':
             if torch.cuda.is_available():
                 device = torch.device('cuda')
@@ -57,7 +48,6 @@ class BaseTrainer(ABC):
         return device
     
     def _setup_reproducibility(self):
-        """Setup random seeds for reproducibility."""
         if self.args.seed is not None:
             random.seed(self.args.seed)
             np.random.seed(self.args.seed)
@@ -72,7 +62,6 @@ class BaseTrainer(ABC):
     
     
     def get_optimizer(self) -> torch.optim.Optimizer:
-        """Create optimizer based on arguments."""
         params = self.model.parameters()
         
         if self.args.optimizer == 'Adam':
@@ -100,7 +89,6 @@ class BaseTrainer(ABC):
         return optimizer
     
     def get_scheduler(self, optimizer) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
-        """Create learning rate scheduler based on arguments."""
         if not hasattr(self.args, 'scheduler') or self.args.scheduler == 'none':
             return None
         elif self.args.scheduler == 'cosine':
@@ -114,7 +102,6 @@ class BaseTrainer(ABC):
     
     
     def save_checkpoint(self, filepath: str, is_best: bool = False):
-        """Save model checkpoint."""
         checkpoint = {
             'epoch': self.current_epoch,
             'model_state_dict': self.model.state_dict(),
@@ -132,7 +119,6 @@ class BaseTrainer(ABC):
             self.best_model_path = best_path
     
     def load_checkpoint(self, filepath: str, load_optimizer: bool = True):
-        """Load model checkpoint."""
         checkpoint = torch.load(filepath, map_location=self.device)
         
         self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -150,7 +136,6 @@ class BaseTrainer(ABC):
         return checkpoint
     
     def log_metrics(self, metrics: Dict[str, float], epoch: Optional[int] = None):
-        """Log metrics to console."""
         if epoch is None:
             epoch = self.current_epoch
         
@@ -158,7 +143,6 @@ class BaseTrainer(ABC):
         print(f"Epoch {epoch} | {metric_str}")
     
     def model_summary(self):
-        """Print model summary."""
         total_params = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
@@ -167,17 +151,13 @@ class BaseTrainer(ABC):
         print(f"Trainable parameters: {trainable_params:,}")
     
     def train(self):
-        """Main training loop."""
-        # Initialize training components
         self.optimizer = self.get_optimizer()
         self.scheduler = self.get_scheduler(self.optimizer)
         self.criterion = self.get_criterion()
         
-        # Resume from checkpoint if specified
         if hasattr(self.args, 'resume') and self.args.resume:
             self.load_checkpoint(self.args.resume)
 
-        # Print model summary
         self.model_summary()
         
         print(f"Starting training for {self.args.epochs} epochs...")
@@ -221,29 +201,22 @@ class BaseTrainer(ABC):
         
         print("Training completed!")
     
-    # Abstract methods that must be implemented by subclasses
-        
     @abstractmethod
     def get_criterion(self) -> nn.Module:
-        """Create loss criterion. Should be implemented by subclass if needed."""
         pass
     
     @abstractmethod
     def train_epoch(self) -> Dict[str, float]:
-        """Train for one epoch. Must return dict of metrics."""
         pass
     
     @abstractmethod
     def validate_epoch(self) -> Dict[str, float]:
-        """Validate for one epoch. Must return dict of metrics."""
         pass
     
     @abstractmethod
     def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass. Must return (loss, predictions)."""
         pass
     
     @abstractmethod
     def inference(self, batch) -> torch.Tensor:
-        """Run inference on a batch. Should be implemented by subclass if needed."""
         pass

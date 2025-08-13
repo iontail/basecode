@@ -3,38 +3,21 @@ import os
 from datetime import datetime
 
 def parse_arguments():
+    description = 'Image Classification Training Configuration'
+    data_choices = ['cifar10', 'cifar100', 'imagenet']
+    model_choices = ['unet', 'resnet18', 'resnet50', 'vit']
+    num_classes = 10
+    hidden_size = 256
+    split_ratio = [0.8, 0.1, 0.1]
+    criterions = 'cross_entropy'
 
-    # setting the value for the project
-    description = 'Image Classification Training Configuration'     # string for description of the project
-    data_choices = ['cifar10', 'cifar100', 'imagenet']              # string list of choices for dataset
-    model_choices = ['resnet18', 'resnet50', 'vit']                 # string list of choices for model
-    num_classes =  10                                               # int for number of classes in the dataset
-    hidden_size = 256                                               # int for hidden size of the model
-    split_ratio = [0.8, 0.1, 0.1]                                   # int list for train, validation, test split ratio
-    criterions = 'cross_entropy'                                    # list for loss function choice
-
-    if description is None:
-        raise ValueError("Description in \'parse_arguments\' is not defined. Please assign the \'description\' variable.")
-    if data_choices is None:
-        raise ValueError("Choice in \'parse_arguments\' is not defined. Please assign the \'choices\' variable.")
-    if model_choices is None:
-        raise ValueError("Model choices in \'parse_arguments\' is not defined. Please assign the \'model_choices\' variable.")  
-    if num_classes is None:
-        raise ValueError("Number of classes in \'parse_arguments\' is not defined. Please assign the \'num_classes\' variable.")
-    if hidden_size is None:
-        raise ValueError("Hidden size in \'parse_arguments\' is not defined. Please assign the \'hidden_size\' variable.")
-    if criterions is None:
-        raise ValueError("Loss function in \'parse_arguments\' is not defined. Please assign the \'criterions\' variable.")
     
     parser = argparse.ArgumentParser(description=description)
 
-    # set seed
     parser.add_argument('--seed', type=int, default=42, 
                         help='Random seed for reproducibility')
     parser.add_argument('--deterministic', action='store_true', default=False,
                         help='Use deterministic algorithms for reproducibility')
-
-    # config for data
     parser.add_argument('--data_path', type=str, default='./data/dataset',
                         help='Path to the dataset')
     parser.add_argument('--dataset', type=str, default=data_choices[0],
@@ -52,7 +35,6 @@ def parse_arguments():
     parser.add_argument('--pin_memory', action='store_true', default=True,
                         help='Use pinned memory for data loading')
     
-    # config for data-preprocessing
     parser.add_argument('--random_crop', action='store_true', default=True,
                         help='Apply random cropping to images')
     parser.add_argument('--random_flip', action='store_true', default=True,
@@ -75,7 +57,6 @@ def parse_arguments():
     parser.add_argument('--mixup_alpha', type=float, default=0.2,
                         help='Alpha parameter for Mixup')
 
-    # config for model
     parser.add_argument('--model', type=str, default=model_choices[0],
                         help='Model to use', choices=model_choices)
     parser.add_argument('--num_classes', type=int, default=num_classes,
@@ -89,7 +70,6 @@ def parse_arguments():
     parser.add_argument('--dropout', type=float, default=0.2,
                         help='Dropout rate')
 
-    # config for training
     parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs for training')
     parser.add_argument('--lr', type=float, default=1e-3,
@@ -111,13 +91,11 @@ def parse_arguments():
                         help='Number of warmup epochs for the learning rate scheduler')
     
 
-    # config for loss and regularization
     parser.add_argument('--criterion', type=list, default=criterions,
                         help='Loss function to use')
     parser.add_argument('--label_smoothing', type=float, default=0.0,
                         help='Label smoothing factor')
 
-    # config for evaluation and testing
     parser.add_argument('--eval_freq', type=int, default=1,
                         help='Frequency of evaluation during training (in epochs)')
     parser.add_argument('--evaluate', action='store_true', default=False,
@@ -125,13 +103,11 @@ def parse_arguments():
     parser.add_argument('--test_only', action='store_true', default=False,
                         help='Only run test evaluation')
 
-    # config for resume and checkpointing
     parser.add_argument('--resume', type=str, default='',
                         help='Path to checkpoint to resume training from')
     parser.add_argument('--load_best', action='store_true', default=False,
                         help='Load best model instead of latest when resuming')
 
-    # config for logging
     parser.add_argument('--log_dir', type=str, default='./logs',
                         help='Directory to save the training logs')
     parser.add_argument('--experiment_name', type=str, 
@@ -148,7 +124,6 @@ def parse_arguments():
     parser.add_argument('--print_freq', type=int, default=100,
                         help='Print frequency during training')
 
-    # config for hardware
     parser.add_argument('--device', type=str, default='auto',
                         choices=['auto', 'cpu', 'cuda', 'mps'],
                         help='Device to use for training')
@@ -163,7 +138,6 @@ def parse_arguments():
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch.compile for optimization (PyTorch 2.0+)')
     
-    # config for saving
     parser.add_argument('--save_best', action='store_true', default=True,
                         help='Save the best model based on validation performance')
     parser.add_argument('--save_last', action='store_true', default=True,
@@ -175,7 +149,6 @@ def parse_arguments():
     parser.add_argument('--keep_checkpoint_max', type=int, default=5,
                         help='Maximum number of checkpoints to keep')
 
-    # config for debugging and development
     parser.add_argument('--debug', action='store_true', default=False,
                         help='Debug mode (use small subset of data)')
     parser.add_argument('--dry_run', action='store_true', default=False,
@@ -185,7 +158,6 @@ def parse_arguments():
     parser.add_argument('--fast_dev_run', action='store_true', default=False,
                         help='Run one batch for debugging')
 
-    # config for early stopping
     parser.add_argument('--early_stopping', action='store_true', default=False,
                         help='Use early stopping')
     parser.add_argument('--patience', type=int, default=10,
@@ -195,7 +167,6 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    # Post-processing and validation
     if args.device == 'auto':
         import torch
         if torch.cuda.is_available():
@@ -205,11 +176,9 @@ def parse_arguments():
         else:
             args.device = 'cpu'
     
-    # Create directories
     os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.log_dir, exist_ok=True)
     
-    # Validate arguments
     if args.grad_clip < 0:
         raise ValueError("Gradient clipping value must be non-negative")
     
@@ -218,7 +187,6 @@ def parse_arguments():
         total = sum(args.split_ratio)
         args.split_ratio = [x/total for x in args.split_ratio]
     
-    # Set experiment name with timestamp if empty
     if not args.experiment_name or args.experiment_name == '':
         print("Experiment name not provided, generating a timestamped name.")
         args.experiment_name = f'{args.model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
@@ -226,8 +194,6 @@ def parse_arguments():
     return args
 
 def print_args(args):
-    """Print arguments in a formatted way"""
-    
     print("=" * 60)
     print("Training Configuration")
     print("=" * 60)
@@ -249,8 +215,6 @@ def print_args(args):
         print("-" * 40)
     
 
-
-# Usage example
 if __name__ == "__main__":
     args = parse_arguments()
     print_args(args)

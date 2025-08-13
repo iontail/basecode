@@ -3,10 +3,7 @@ from arguments import parse_arguments, print_args
 
 cfg = edict()
 
-# Function to retrieve configurations based on the name
-def get_dataset_config(name, args):
-
-    # Dataset configurations
+def get_config(name):
     cfg.dataset_configs = edict({
         'cifar10': edict(num_classes=10, img_size=32,
                         mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010]),
@@ -18,30 +15,26 @@ def get_dataset_config(name, args):
     
     return cfg.dataset_configs.get(name, None)
 
-def get_optimizer_config(name, args):
+def get_dataset_config(name, args):
+    return get_config(name)
 
-    # Optimizer configurations
+def get_optimizer_config(name, args):
     cfg.optimizer_configs = edict({
-    'AdamW': edict(lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.999)),
-    'SGD': edict(lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay),
-    'Adam': edict(lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.999)),
+        'AdamW': edict(lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.999)),
+        'SGD': edict(lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay),
+        'Adam': edict(lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.999)),
     })
     return cfg.optimizer_configs.get(name, None)
 
 def get_scheduler_config(name, args):
-
-    # Scheduler configurations
     cfg.scheduler_configs = edict({
         'cosine': edict(T_max=100, eta_min=1e-6),
         'step': edict(step_size=30, gamma=0.1),
         'plateau': edict(patience=10, factor=0.1),
     })
-
     return cfg.scheduler_configs.get(name, None)
 
 def get_augmentation_config(name, args):
-
-    # Augmentation configurations
     cfg.augmentation_configs = edict({
         'basic': edict(random_crop=args.random_crop, random_flip=args.random_flip, normalize=args.normalize),
         'advanced': edict(
@@ -54,12 +47,10 @@ def get_augmentation_config(name, args):
             mixup_alpha=args.mixup_alpha,
         )
     })
-
     return cfg.augmentation_configs.get(name, None)
 
 if __name__ == "__main__":
-    # Example usage
-    print("Dataset Config for CIFAR-10:", get_dataset_config('cifar10'))
+    print("Dataset Config for CIFAR-10:", get_config('cifar10'))
     print("Optimizer Config for AdamW:", get_optimizer_config('AdamW'))
     print("Scheduler Config for cosine:", get_scheduler_config('cosine'))
     print("Augmentation Config for basic:", get_augmentation_config('basic'))

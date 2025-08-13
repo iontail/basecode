@@ -11,11 +11,9 @@ def main():
     args = parse_arguments()
     print_args(args)
     
-    # Get dataset configuration
     config = get_config(args.dataset)
     args.num_classes = config['num_classes']
     
-    # Initialize model
     if args.model == 'unet':
         model = UNet(
             channels=[32, 64, 128, 256], 
@@ -25,13 +23,8 @@ def main():
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     
-    # Get data loaders
     train_loader, val_loader, test_loader = get_dataloader(args)
-    
-    # Initialize trainer
     trainer = MainTrainer(model, args, train_loader, val_loader, test_loader)
-    
-    # Start training
     trainer.train()
 
 

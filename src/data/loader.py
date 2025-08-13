@@ -16,21 +16,10 @@ def create_dataloader(
     normalize: bool = True,
     return_class_mapping: bool = False
     ) -> DataLoader:
-    """Create DataLoader for image classification."""
     
-
-    # ============================
-    # Define the data extensions to look for
-    # ============================
     extensions = ['.jpg']
-
-    # Collect all image paths with labels
     image_paths, class_mapping = collect_image_paths(data_dir, extensions=extensions)
     
-    # ============================
-    # Define transforms
-    # or fill custom transformations in dataset.py
-    # ============================
     transform_list = [
         transforms.Resize((image_size, image_size)),
         transforms.ToTensor()
@@ -40,8 +29,6 @@ def create_dataloader(
         transform_list.append(transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]))
     
     transform = transforms.Compose(transform_list)
-    
-    # Create dataset
     dataset = CustomDataset(image_paths, transform=transform)
     
     return DataLoader(
@@ -60,3 +47,31 @@ def create_dataloader(
         ),
         class_mapping
     )
+
+
+def get_dataloader(args):
+    train_loader = create_dataloader(
+        args.data_path + '/train',
+        args.batch_size,
+        shuffle=True,
+        image_size=args.resize,
+        num_workers=args.num_workers
+    )
+    
+    val_loader = create_dataloader(
+        args.data_path + '/val', 
+        args.val_batch_size,
+        shuffle=False,
+        image_size=args.resize,
+        num_workers=args.num_workers
+    )
+    
+    test_loader = create_dataloader(
+        args.data_path + '/test',
+        args.test_batch_size, 
+        shuffle=False,
+        image_size=args.resize,
+        num_workers=args.num_workers
+    )
+    
+    return train_loader, val_loader, test_loader

@@ -6,7 +6,6 @@ from typing import List
 from base_models import BaseModel
 
 
-
 class ResidualLayer(nn.Module):
     def __init__(self, channels: int):
         super().__init__()
@@ -65,12 +64,8 @@ class Decoder(nn.Module):
 
     
 class UNet(BaseModel):
-    """
-    My custom model implementation.
-    """
     def __init__(self, channels: List[int], num_res_blocks: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
 
         self.init_conv = nn.Sequential(
             nn.Conv2d(1, channels[0], kernel_size=3, padding=1),
@@ -90,11 +85,9 @@ class UNet(BaseModel):
         self.midcoder = Midcoder(channels[-1], num_res_blocks)
         self.final_conv = nn.Conv2d(channels[0], 1, kernel_size=3, padding=1)
         
-        self.hidden_dim = channels[0]  # Assuming the output dimension is the same as the first channel size
+        self.hidden_dim = channels[0]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Implement the forward pass
-
         x = self.init_conv(x)
         skips = []
 
@@ -112,12 +105,10 @@ class UNet(BaseModel):
         return self.final_conv(x)
     
     def inference(self, x: torch.Tensor) -> torch.Tensor:
-        # Implement the inference logic
         return self.forward(x)
     
     @property
     def dim(self) -> int:
-        # Return the dimension of the model's output
         return self.hidden_dim
     
 
