@@ -110,7 +110,7 @@ class MainTrainer(BaseTrainer):
 
 ## 🐛 Issues & Support
 
-Found a bug or have questions? Please contact me at **leechanhye3722@gmail.com**
+Found a bug or have questions? Please contact me at **leechanhye@g.skku.edu**
 
 ## 📄 License
 
