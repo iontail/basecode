@@ -4,3 +4,4 @@ logs/
 checkpoints/
 *.pt
 *.pth
+.venv/
