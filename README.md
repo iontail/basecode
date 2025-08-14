@@ -53,7 +53,7 @@ Begin by cloning the repository and setting up the environment:
 ### Option 1: Using UV (Recommended)
 
 ```bash
-git clone https://github.com/yourname/research-base-template.git
+git clone https://github.com/iontail/basecode.git
 cd [your directory]
 
 # Install UV if not already installed
@@ -71,7 +71,7 @@ source .venv/bin/activate  # On Unix/macOS
 ### Option 2: Using Conda + Pip
 
 ```bash
-git clone https://github.com/yourname/research-base-template.git
+git clone https://github.com/iontail/basecode.git
 cd [your directory]
 
 # Create and activate conda environment
