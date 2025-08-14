@@ -1,146 +1,113 @@
-# 🧠 Research Base Template
+# PyTorch Research Template
 
-> A modular and extensible codebase for deep learning research.  
-> Easily adaptable for various tasks
+A clean, modular template for deep learning research. Get started quickly with computer vision, audio, or multimodal projects.
 
-This repository provides a clean and reusable foundation for a wide range of research projects in computer vision, audio, and multimodal learning.  
-It is designed to support **rapid prototyping**, **structured experimentation**, and **modular customization**.
+## Quick Start
 
----
-
-## 📁 Folder Structure
-
-Organize the folders as:
-
-```
-.
-├── config/              # Python configs for each experiment
-│   └── config.py
-├── src/                 # Core logic
-│   ├── data/            # Dataset, collators, transforms, dataloader
-│   │   ├── dataset.py
-│   │   ├── loader.py
-│   │   ├── mapping.py   # label mapping
-│   │   └── collator.py
-│   ├── models/          # Model definitions 
-│   │   └── model.py
-│   ├── trainer/         # Training and evaluation logic based on trainer
-│   │   ├── basetrainer.py
-│   │   └── maintrainer.py # define your own Trainer based on basetrainer.py
-│   └── utils/               # Common utilities (logging, metrics, etc.)
-|
-├── dataset/             # Dataset files or symbolic links
-│   ├── train.txt
-│   ├── val.txt
-│   └── YourDataset/
-│       ├── classA/
-│       └── classB/
-├── checkpoints/         # Auto-generated when training
-├── log/                 # Auto-generated when running arguments.py or related code
-├── train.py             # Entry point for training
-├── test.py              # Entry point for evaluation
-├── arguments.py         # Command-line argument parser
-├── requirements.txt
-└── README.md
-```
-
----
-
-## 🚀 Getting Started
-
-Begin by cloning the repository and setting up the environment:
-
-### Option 1: Using UV (Recommended)
+### 1. Setup Environment
 
 ```bash
-git clone https://github.com/iontail/basecode.git
-cd [your directory]
+# Clone repository
+git clone <your-repo-url>
+cd basecode
 
-# Install UV if not already installed
+# Option 1: UV (Recommended)
 pip install uv
-
-# Create virtual environment and install dependencies
 uv sync
+source .venv/bin/activate
 
-# Activate the environment
-source .venv/bin/activate  # On Unix/macOS
-# or
-.venv\Scripts\activate  # On Windows
-```
-
-### Option 2: Using Conda + Pip
-
-```bash
-git clone https://github.com/iontail/basecode.git
-cd [your directory]
-
-# Create and activate conda environment
-conda create -y -n basecode python=3.12
+# Option 2: Conda
+conda create -n basecode python=3.12
 conda activate basecode
-
-# Install dependencies
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
-> ✅ You can modify `requirements.txt` (for pip/conda) or `pyproject.toml` (for uv) as needed for each specific project.
+### 2. Customize for Your Research
 
----
+Edit these key files:
 
-## ⚙️ How to Customize for Your Research
+| File | What to Change |
+|------|----------------|
+| `src/models/model.py` | Your model architecture |
+| `src/data/dataset.py` | Dataset loading & preprocessing |
+| `src/trainer/main_trainer.py` | Training loop logic |
+| `arguments.py` | Add your hyperparameters |
 
-Depending on your task (e.g., classification, detection, multimodal), you should mainly customize the following:
-
-| File                        | Purpose                                  |
-|----------------------------|------------------------------------------|
-| `src/models/model.py`      | Define your model architecture           |
-| `src/data/dataset.py`      | Load and preprocess your dataset         |
-| `src/data/collator.py`     | Customize batch structure if needed      |
-| `src/trainer/maintrainer.py` | Write task-specific training logic     |
-| `config/config.py` or `arguments.py` | Manage hyperparameters and options |
-
----
-
-## 🏁 Training & Evaluation
-
-### Using UV
+### 3. Run Training
 
 ```bash
-# Training
-uv run python train.py --train_data_dir ./dataset/YourDataset --batch_size 32 --epochs 100
+# Start training
+python train.py --train_data_dir ./your_dataset --epochs 100
 
-# Testing
-uv run python test.py --weights ./weights/your_model.pth
+# Evaluate model
+python test.py --weights ./checkpoints/best_model.pth
 ```
 
-### Using Traditional Python
+## Project Structure
 
-```bash
-# Training
-python train.py --train_data_dir ./dataset/YourDataset --batch_size 32 --epochs 100
+```
+src/
+├── data/           # Dataset & data loading
+├── models/         # Model definitions
+├── trainer/        # Training logic
+└── utils/          # Logging, metrics, etc.
 
-# Testing
-python test.py --weights ./weights/your_model.pth
+train.py           # Training entry point
+test.py            # Evaluation entry point
+arguments.py       # CLI arguments
 ```
 
----
+## Implementation Guide
 
-## 📌 Features
+### 1. Define Your Model
+```python
+# src/models/model.py
+from .base_models import BaseModel
 
-- ✅ Clean modular structure
-- ✅ Custom collate function support
-- ✅ Easy integration of config files or CLI arguments
-- ✅ Supports PyTorch native checkpointing and logging
-- ✅ Easily extensible to multi-GPU or distributed training
+class YourModel(BaseModel):
+    def forward(self, x):
+        # Your forward pass
+        return output
+```
 
----
+### 2. Create Dataset Class
+```python
+# src/data/dataset.py
+from torch.utils.data import Dataset
 
-## 🛠️ Todo (Optional)
+class YourDataset(Dataset):
+    def __init__(self, data_dir):
+        # Load your data
+        pass
+    
+    def __getitem__(self, idx):
+        # Return sample
+        return data, label
+```
 
-- [ ] modify `src/trainer/basetrainer.py` for custom trainer
+### 3. Customize Training
+```python
+# src/trainer/main_trainer.py
+from .base_trainer import BaseTrainer
 
----
+class MainTrainer(BaseTrainer):
+    def get_criterion(self):
+        return nn.CrossEntropyLoss()
+    
+    def train_epoch(self):
+        # Your training logic
+        pass
+```
 
-## 📄 License
+## Features
 
-This project is open to everyone for research purposes.
+- Mixed precision training (AMP)
+- Automatic checkpointing
+- WandB/TensorBoard logging
+- Multi-GPU support
+- Learning rate scheduling
+- Early stopping
+
+## License
+
+Open for research use.
