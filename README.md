@@ -8,7 +8,7 @@ A clean, modular template for deep learning research. Get started quickly with c
 
 ```bash
 # Clone repository
-git clone <your-repo-url>
+git clone https://github.com/iontail/basecode.git
 cd basecode
 
 # Option 1: UV (Recommended)
