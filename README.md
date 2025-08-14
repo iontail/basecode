@@ -50,6 +50,26 @@ Organize the folders as:
 
 Begin by cloning the repository and setting up the environment:
 
+### Option 1: Using UV (Recommended)
+
+```bash
+git clone https://github.com/yourname/research-base-template.git
+cd [your directory]
+
+# Install UV if not already installed
+pip install uv
+
+# Create virtual environment and install dependencies
+uv sync
+
+# Activate the environment
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+```
+
+### Option 2: Using Conda + Pip
+
 ```bash
 git clone https://github.com/yourname/research-base-template.git
 cd [your directory]
@@ -63,7 +83,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 pip install -r requirements.txt
 ```
 
-> ✅ You can modify `requirements.txt` as needed for each specific project.
+> ✅ You can modify `requirements.txt` (for pip/conda) or `pyproject.toml` (for uv) as needed for each specific project.
 
 ---
 
@@ -83,15 +103,23 @@ Depending on your task (e.g., classification, detection, multimodal), you should
 
 ## 🏁 Training & Evaluation
 
-Example training command:
+### Using UV
 
 ```bash
-python train.py --train_data_dir ./dataset/YourDataset --batch_size 32 --epochs 100
+# Training
+uv run python train.py --train_data_dir ./dataset/YourDataset --batch_size 32 --epochs 100
+
+# Testing
+uv run python test.py --weights ./weights/your_model.pth
 ```
 
-Example testing command:
+### Using Traditional Python
 
 ```bash
+# Training
+python train.py --train_data_dir ./dataset/YourDataset --batch_size 32 --epochs 100
+
+# Testing
 python test.py --weights ./weights/your_model.pth
 ```
 
