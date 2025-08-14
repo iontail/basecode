@@ -1,18 +1,22 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple, Any
 import os
-import time
 import torch
 import torch.nn as nn
 from torch.optim import Adam, AdamW, SGD, RMSprop
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, ReduceLROnPlateau, ExponentialLR
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
 import random
 import numpy as np
-import logging
+from tqdm import tqdm
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 
 class BaseTrainer(ABC):
@@ -42,6 +46,7 @@ class BaseTrainer(ABC):
         
         # Logging
         self.writer = None
+        self.wandb_run = None
         self._setup_logging()
         
         self._setup_reproducibility()
@@ -85,6 +90,13 @@ class BaseTrainer(ABC):
         if self.args.use_tensorboard:
             log_path = os.path.join(self.args.log_dir, self.args.experiment_name)
             self.writer = SummaryWriter(log_path)
+        
+        if self.args.use_wandb and WANDB_AVAILABLE:
+            self.wandb_run = wandb.init(
+                project=getattr(self.args, 'wandb_project', 'deep_learning'),
+                name=self.args.experiment_name,
+                config=vars(self.args)
+            )
     
     def _setup_multigpu(self):
         if self.args.use_multigpu and torch.cuda.device_count() > 1:
@@ -150,7 +162,6 @@ class BaseTrainer(ABC):
             return ExponentialLR(optimizer, gamma=gamma)
         else:
             raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
-    
     
     def save_checkpoint(self, filepath: str, is_best: bool = False, additional_info: Dict[str, Any] = None):
         # Handle DataParallel models
@@ -220,14 +231,22 @@ class BaseTrainer(ABC):
             if self.writer:
                 for metric_name, value in phase_metrics.items():
                     self.writer.add_scalar(f"{phase}/{metric_name}", value, epoch)
+            
+            # Log to WandB
+            if self.wandb_run:
+                wandb_metrics = {f"{phase}_{k}": v for k, v in phase_metrics.items()}
+                wandb.log(wandb_metrics, step=epoch)
         
         if phase_parts:
             print(f"Epoch {epoch} | {' | '.join(phase_parts)}")
         
         # Log learning rate
-        if self.writer and self.optimizer:
+        if self.optimizer:
             current_lr = self.optimizer.param_groups[0]['lr']
-            self.writer.add_scalar('learning_rate', current_lr, epoch)
+            if self.writer:
+                self.writer.add_scalar('learning_rate', current_lr, epoch)
+            if self.wandb_run:
+                wandb.log({'learning_rate': current_lr}, step=epoch)
     
     def model_summary(self):
         total_params = sum(p.numel() for p in self.model.parameters())
@@ -243,13 +262,6 @@ class BaseTrainer(ABC):
         print(f"Model size: {size_mib:.2f} MiB ({size_bytes:,} bytes)")
     
     def model_size_b(self, model: nn.Module) -> int:
-        """
-        Returns model size in bytes. Based on https://discuss.pytorch.org/t/finding-model-size/130275/2
-        Args:
-        - model: self-explanatory
-        Returns:
-        - size: model size in bytes
-        """
         size = 0
         for param in model.parameters():
             size += param.nelement() * param.element_size()
@@ -271,14 +283,14 @@ class BaseTrainer(ABC):
 
         eval_freq = getattr(self.args, 'eval_freq', 1)
 
-        for epoch in range(self.current_epoch, self.args.epochs):
+        epoch_range = range(self.current_epoch, self.args.epochs)
+        for epoch in tqdm(epoch_range, desc="Training Progress", unit="epoch", initial=self.current_epoch, total=self.args.epochs):
             self.current_epoch = epoch + 1
             
             # Training phase
             train_metrics = self.train_epoch()
             
             # Validation phase
-            
             if epoch % eval_freq == 0:
                 val_metrics = self.validate_epoch()
             else:
@@ -322,8 +334,10 @@ class BaseTrainer(ABC):
         if self.writer:
             self.writer.close()
         
+        if self.wandb_run:
+            wandb.finish()
+        
         print("Training completed!")
-
     
     @abstractmethod
     def get_criterion(self) -> nn.Module:
