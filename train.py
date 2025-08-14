@@ -4,15 +4,9 @@ from arguments import parse_arguments, print_args
 from src.models.model import UNet
 from src.trainer.main_trainer import MainTrainer
 from src.data.loader import get_dataloader
-from config.config import get_config
-
-
 def main():
     args = parse_arguments()
     print_args(args)
-    
-    config = get_config(args.dataset)
-    args.num_classes = config['num_classes']
     
     if args.model == 'unet':
         model = UNet(

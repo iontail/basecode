@@ -3,16 +3,13 @@ import os
 from datetime import datetime
 
 def parse_arguments():
-    description = 'Image Classification Training Configuration'
-    data_choices = ['cifar10', 'cifar100', 'imagenet']
-    model_choices = ['unet', 'resnet18', 'resnet50', 'vit']
-    num_classes = 10
-    hidden_size = 256
-    split_ratio = [0.8, 0.1, 0.1]
-    criterions = 'cross_entropy'
+    dataset_configs = {
+        'cifar10': {'num_classes': 10, 'img_size': 32, 'mean': [0.4914, 0.4822, 0.4465], 'std': [0.2023, 0.1994, 0.2010]},
+        'cifar100': {'num_classes': 100, 'img_size': 32, 'mean': [0.5071, 0.4867, 0.4408], 'std': [0.2675, 0.2565, 0.2761]},
+        'imagenet': {'num_classes': 1000, 'img_size': 224, 'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]},
+    }
 
-    
-    parser = argparse.ArgumentParser(description=description)
+    parser = argparse.ArgumentParser(description='Image Classification Training Configuration')
 
     parser.add_argument('--seed', type=int, default=42, 
                         help='Random seed for reproducibility')
@@ -20,8 +17,8 @@ def parse_arguments():
                         help='Use deterministic algorithms for reproducibility')
     parser.add_argument('--data_path', type=str, default='./data/dataset',
                         help='Path to the dataset')
-    parser.add_argument('--dataset', type=str, default=data_choices[0],
-                        help='Name of the dataset to use', choices=data_choices)
+    parser.add_argument('--dataset', type=str, default='cifar10',
+                        help='Name of the dataset to use', choices=['cifar10', 'cifar100', 'imagenet'])
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size for training')
     parser.add_argument('--val_batch_size', type=int, default=32,
@@ -30,7 +27,7 @@ def parse_arguments():
                         help='Batch size for testing')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='Number of workers for data loading')
-    parser.add_argument('--split_ratio', type=float, nargs=3, default=split_ratio,
+    parser.add_argument('--split_ratio', type=float, nargs=3, default=[0.8, 0.1, 0.1],
                         help='Ratio for train, validation, and test split')
     parser.add_argument('--pin_memory', action='store_true', default=True,
                         help='Use pinned memory for data loading')
@@ -57,11 +54,11 @@ def parse_arguments():
     parser.add_argument('--mixup_alpha', type=float, default=0.2,
                         help='Alpha parameter for Mixup')
 
-    parser.add_argument('--model', type=str, default=model_choices[0],
-                        help='Model to use', choices=model_choices)
-    parser.add_argument('--num_classes', type=int, default=num_classes,
+    parser.add_argument('--model', type=str, default='unet',
+                        help='Model to use', choices=['unet', 'resnet18', 'resnet50', 'vit'])
+    parser.add_argument('--num_classes', type=int, default=10,
                         help='Number of classes in the dataset')
-    parser.add_argument('--hidden_size', type=int, default=hidden_size,
+    parser.add_argument('--hidden_size', type=int, default=256,
                         help='Hidden size for the model')
     parser.add_argument('--expansion_ratio', type=float, default=4.0,
                         help='Ratio of expansion to hidden size')
@@ -91,7 +88,7 @@ def parse_arguments():
                         help='Number of warmup epochs for the learning rate scheduler')
     
 
-    parser.add_argument('--criterion', type=list, default=criterions,
+    parser.add_argument('--criterion', type=str, default='cross_entropy',
                         help='Loss function to use')
     parser.add_argument('--label_smoothing', type=float, default=0.0,
                         help='Label smoothing factor')
@@ -190,6 +187,14 @@ def parse_arguments():
     if not args.experiment_name or args.experiment_name == '':
         print("Experiment name not provided, generating a timestamped name.")
         args.experiment_name = f'{args.model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+    
+    # Add dataset configuration to args
+    if args.dataset in dataset_configs:
+        config = dataset_configs[args.dataset]
+        args.num_classes = config['num_classes']
+        args.img_size = config['img_size']
+        args.mean = config['mean']
+        args.std = config['std']
     
     return args
 
