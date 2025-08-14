@@ -45,15 +45,15 @@ class BaseModel(nn.Module, ABC):
     
     def model_size_b(self) -> int:
         size = 0
-        for param in self.model.parameters():
+        for param in self.parameters():
             size += param.nelement() * param.element_size()
-        for buf in self.model.buffers():
+        for buf in self.buffers():
             size += buf.nelement() * buf.element_size()
         return size
     
     def model_summary(self):
-        total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         model_size_bytes = self.model_size_b()
         model_size_mb = model_size_bytes / (1024 ** 2)
         
@@ -61,4 +61,31 @@ class BaseModel(nn.Module, ABC):
         print(f"Total parameters: {total_params:,}")
         print(f"Trainable parameters: {trainable_params:,}")
         print(f"Model size: {model_size_mb:.2f} MiB ({model_size_bytes:,} bytes)")
+    
+    def count_parameters(self) -> Tuple[int, int]:
+        """Return (total_params, trainable_params)"""
+        total = sum(p.numel() for p in self.parameters())
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        return total, trainable
+    
+    def get_device(self) -> torch.device:
+        """Get the device of the model"""
+        return next(self.parameters()).device
+    
+    def to_device(self, device: Union[torch.device, str]) -> 'BaseModel':
+        """Move model to device"""
+        return self.to(device)
+    
+    def freeze_backbone(self, unfreeze_layers: Optional[List[str]] = None) -> 'BaseModel':
+        """Freeze all parameters except specified layers"""
+        for name, param in self.named_parameters():
+            if unfreeze_layers and any(layer in name for layer in unfreeze_layers):
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+        return self
+    
+    def get_trainable_parameters(self):
+        """Get only trainable parameters (useful for optimizer)"""
+        return [p for p in self.parameters() if p.requires_grad]
     

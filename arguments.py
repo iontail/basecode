@@ -47,6 +47,16 @@ def parse_arguments():
                         help='Use Mixup data augmentation')
     parser.add_argument('--mixup_alpha', type=float, default=0.2,
                         help='Alpha parameter for Mixup')
+    parser.add_argument('--color_jitter', action='store_true', default=False,
+                        help='Apply color jittering')
+    parser.add_argument('--random_rotation', action='store_true', default=False,
+                        help='Apply random rotation')
+    parser.add_argument('--gaussian_blur', action='store_true', default=False,
+                        help='Apply gaussian blur')
+    parser.add_argument('--balanced_sampling', action='store_true', default=False,
+                        help='Use balanced sampling for imbalanced datasets')
+    parser.add_argument('--memory_efficient', action='store_true', default=False,
+                        help='Use memory efficient dataset loading')
 
     parser.add_argument('--model', type=str, default='unet',
                         help='Model to use', choices=['unet', 'resnet18', 'resnet50', 'vit'])
