@@ -3,12 +3,6 @@ import os
 from datetime import datetime
 
 def parse_arguments():
-    dataset_configs = {
-        'cifar10': {'num_classes': 10, 'img_size': 32, 'mean': [0.4914, 0.4822, 0.4465], 'std': [0.2023, 0.1994, 0.2010]},
-        'cifar100': {'num_classes': 100, 'img_size': 32, 'mean': [0.5071, 0.4867, 0.4408], 'std': [0.2675, 0.2565, 0.2761]},
-        'imagenet': {'num_classes': 1000, 'img_size': 224, 'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]},
-    }
-
     parser = argparse.ArgumentParser(description='Image Classification Training Configuration')
 
     parser.add_argument('--seed', type=int, default=42, 
@@ -58,6 +52,12 @@ def parse_arguments():
                         help='Model to use', choices=['unet', 'resnet18', 'resnet50', 'vit'])
     parser.add_argument('--num_classes', type=int, default=10,
                         help='Number of classes in the dataset')
+    parser.add_argument('--img_size', type=int, default=32,
+                        help='Image size for the dataset')
+    parser.add_argument('--mean', type=float, nargs=3, default=[0.4914, 0.4822, 0.4465],
+                        help='Mean values for normalization')
+    parser.add_argument('--std', type=float, nargs=3, default=[0.2023, 0.1994, 0.2010],
+                        help='Standard deviation values for normalization')
     parser.add_argument('--hidden_size', type=int, default=256,
                         help='Hidden size for the model')
     parser.add_argument('--expansion_ratio', type=float, default=4.0,
@@ -86,6 +86,12 @@ def parse_arguments():
                         choices=['step', 'cosine', 'plateau', 'exponential', 'none'])
     parser.add_argument('--warmup_epochs', type=int, default=5,
                         help='Number of warmup epochs for the learning rate scheduler')
+    parser.add_argument('--gamma', type=float, default=0.1,
+                        help='Gamma value for step scheduler')
+    parser.add_argument('--scheduler_patience', type=int, default=10,
+                        help='Patience for ReduceLROnPlateau scheduler')
+    parser.add_argument('--scheduler_factor', type=float, default=0.1,
+                        help='Factor for ReduceLROnPlateau schedulerz')
     
 
     parser.add_argument('--criterion', type=str, default='cross_entropy',
@@ -188,13 +194,6 @@ def parse_arguments():
         print("Experiment name not provided, generating a timestamped name.")
         args.experiment_name = f'{args.model}_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
     
-    # Add dataset configuration to args
-    if args.dataset in dataset_configs:
-        config = dataset_configs[args.dataset]
-        args.num_classes = config['num_classes']
-        args.img_size = config['img_size']
-        args.mean = config['mean']
-        args.std = config['std']
     
     return args
 

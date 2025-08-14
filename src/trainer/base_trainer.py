@@ -77,10 +77,11 @@ class BaseTrainer(ABC):
                 weight_decay=self.args.weight_decay
             )
         elif self.args.optimizer == 'SGD':
+            momentum = getattr(self.args, 'momentum', 0.9)
             optimizer = SGD(
                 params,
                 lr=self.args.lr,
-                momentum=self.args.momentum,
+                momentum=momentum,
                 weight_decay=self.args.weight_decay
             )
         else:
@@ -94,9 +95,13 @@ class BaseTrainer(ABC):
         elif self.args.scheduler == 'cosine':
             return CosineAnnealingLR(optimizer, T_max=self.args.epochs)
         elif self.args.scheduler == 'step':
-            return StepLR(optimizer, step_size=self.args.epochs // 3, gamma=0.1)
+            step_size = getattr(self.args, 'step_size', self.args.epochs // 3)
+            gamma = getattr(self.args, 'gamma', 0.1)
+            return StepLR(optimizer, step_size=step_size, gamma=gamma)
         elif self.args.scheduler == 'plateau':
-            return ReduceLROnPlateau(optimizer, mode='min', patience=10, factor=0.1)
+            patience = getattr(self.args, 'scheduler_patience', 10)
+            factor = getattr(self.args, 'scheduler_factor', 0.1)
+            return ReduceLROnPlateau(optimizer, mode='min', patience=patience, factor=factor)
         else:
             raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
     
@@ -125,9 +130,10 @@ class BaseTrainer(ABC):
         
         if load_optimizer and self.optimizer and checkpoint.get('optimizer_state_dict'):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        
+
         if self.scheduler and checkpoint.get('scheduler_state_dict'):
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
         
         self.current_epoch = checkpoint.get('epoch', 0)
         self.best_metric = checkpoint.get('best_metric', None)
@@ -135,20 +141,47 @@ class BaseTrainer(ABC):
         print(f"Loaded checkpoint from {filepath}")
         return checkpoint
     
-    def log_metrics(self, metrics: Dict[str, float], epoch: Optional[int] = None):
+    def log_metrics(self, metrics: Dict[str, Dict[str, float]], epoch: Optional[int] = None):
         if epoch is None:
             epoch = self.current_epoch
+
+        phase_parts = []
+        for phase, phase_metrics in metrics.items():
+            if not phase_metrics:
+                continue
+            metric_items = [f"{k}: {v:.4f}" for k, v in phase_metrics.items()]
+            phase_parts.append(f"{phase.upper()}: {' | '.join(metric_items)}")
         
-        metric_str = ' | '.join([f'{k}: {v:.4f}' for k, v in metrics.items()])
-        print(f"Epoch {epoch} | {metric_str}")
+        if phase_parts:
+            print(f"Epoch {epoch} | {' | '.join(phase_parts)}")
     
     def model_summary(self):
         total_params = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
+        MiB = 1024 ** 2
+        size_bytes = self.model_size_b(self.model)
+        size_mib = size_bytes / MiB
+        
         print(f"Model Summary:")
         print(f"Total parameters: {total_params:,}")
         print(f"Trainable parameters: {trainable_params:,}")
+        print(f"Model size: {size_mib:.2f} MiB ({size_bytes:,} bytes)")
+    
+    def model_size_b(self, model: nn.Module) -> int:
+        """
+        Returns model size in bytes. Based on https://discuss.pytorch.org/t/finding-model-size/130275/2
+        Args:
+        - model: self-explanatory
+        Returns:
+        - size: model size in bytes
+        """
+        size = 0
+        for param in model.parameters():
+            size += param.nelement() * param.element_size()
+        for buf in model.buffers():
+            size += buf.nelement() * buf.element_size()
+        return size
     
     def train(self):
         self.optimizer = self.get_optimizer()
@@ -156,27 +189,29 @@ class BaseTrainer(ABC):
         self.criterion = self.get_criterion()
         
         if hasattr(self.args, 'resume') and self.args.resume:
-            self.load_checkpoint(self.args.resume)
+            _ = self.load_checkpoint(self.args.resume, load_optimizer=True)
 
         self.model_summary()
         
         print(f"Starting training for {self.args.epochs} epochs...")
-        
+
+        eval_freq = getattr(self.args, 'eval_freq', 1)
+
         for epoch in range(self.current_epoch, self.args.epochs):
-            self.current_epoch = epoch
+            self.current_epoch = epoch + 1
             
             # Training phase
             train_metrics = self.train_epoch()
             
             # Validation phase
-            eval_freq = getattr(self.args, 'eval_freq', 1)
+            
             if epoch % eval_freq == 0:
                 val_metrics = self.validate_epoch()
             else:
                 val_metrics = {}
             
             # Combine metrics
-            all_metrics = {**train_metrics, **val_metrics}
+            all_metrics = {'train': train_metrics, 'val': val_metrics}
             
             # Log metrics
             self.log_metrics(all_metrics, epoch)
@@ -203,20 +238,25 @@ class BaseTrainer(ABC):
     
     @abstractmethod
     def get_criterion(self) -> nn.Module:
+        """Return the loss criterion for training."""
         pass
     
     @abstractmethod
     def train_epoch(self) -> Dict[str, float]:
+        """Execute one training epoch and return training metrics."""
         pass
     
     @abstractmethod
     def validate_epoch(self) -> Dict[str, float]:
+        """Execute validation and return validation metrics."""
         pass
     
     @abstractmethod
     def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass through model and compute loss. Return (loss, predictions)."""
         pass
     
     @abstractmethod
     def inference(self, batch) -> torch.Tensor:
+        """Run inference without gradient computation. Return predictions."""
         pass
