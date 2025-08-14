@@ -1,8 +1,8 @@
-# PyTorch Research Template
+# 🔬 PyTorch Research Template
 
 A clean, modular template for deep learning research. Get started quickly with computer vision, audio, or multimodal projects.
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Setup Environment
 
@@ -43,7 +43,7 @@ python train.py --train_data_dir ./your_dataset --epochs 100
 python test.py --weights ./checkpoints/best_model.pth
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
@@ -57,7 +57,7 @@ test.py            # Evaluation entry point
 arguments.py       # CLI arguments
 ```
 
-## Implementation Guide
+## 🛠️ Implementation Guide
 
 ### 1. Define Your Model
 ```python
@@ -99,7 +99,7 @@ class MainTrainer(BaseTrainer):
         pass
 ```
 
-## Features
+## ✨ Features
 
 - Mixed precision training (AMP)
 - Automatic checkpointing
@@ -108,6 +108,10 @@ class MainTrainer(BaseTrainer):
 - Learning rate scheduling
 - Early stopping
 
-## License
+## 🐛 Issues & Support
+
+Found a bug or have questions? Please contact me at **leechanhye3722@gmail.com**
+
+## 📄 License
 
 Open for research use.
