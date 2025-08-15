@@ -36,10 +36,12 @@ Edit these key files:
 ### 3. Run Training
 
 ```bash
-# Start training
-python train.py --train_data_dir ./your_dataset --epochs 100
+# UV environment
+uv run python train.py --train_data_dir ./your_dataset --epochs 100
+uv run python test.py --weights ./checkpoints/best_model.pth
 
-# Evaluate model
+# Traditional environment
+python train.py --train_data_dir ./your_dataset --epochs 100
 python test.py --weights ./checkpoints/best_model.pth
 ```
 
