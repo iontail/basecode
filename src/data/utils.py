@@ -19,7 +19,7 @@ def get_class_mapping(data_dir: Path) -> Dict[str, int]:
 
 def collect_image_paths(
     data_dir: Union[str, Path], 
-    extensions: List[str] = None,
+    extensions: List[str],
     recursive: bool = True
 ) -> Tuple[List[Tuple[Path, int]], Dict[str, int]]:
     """
@@ -32,9 +32,6 @@ def collect_image_paths(
         - tuple: (list of (image_path, label) tuples, class_mapping dictionary)
     """
     data_dir = Path(data_dir)
-    
-    if extensions is None:
-        extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
     
     extensions = [ext.lower() for ext in extensions]
     image_paths = []

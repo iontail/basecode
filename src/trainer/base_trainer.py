@@ -118,6 +118,9 @@ class BaseTrainer(ABC):
         
         # Multi-GPU support
         self._setup_multigpu()
+        
+        # Apply weight initialization if specified
+        self._apply_weight_initialization()
     
     def _setup_device(self) -> torch.device:
         """
@@ -186,6 +189,15 @@ class BaseTrainer(ABC):
         
         if self.args.compile and hasattr(torch, 'compile'):
             self.model = torch.compile(self.model)
+    
+    def _apply_weight_initialization(self):
+        """
+        Apply weight initialization to model by calling initialize_weights method
+        """
+        if hasattr(self.model, 'initialize_weights') and callable(getattr(self.model, 'initialize_weights')):
+            self.model.initialize_weights()
+        else:
+            print("Model does not have initialize_weights method")
     
     
     def get_optimizer(self) -> torch.optim.Optimizer:

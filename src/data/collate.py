@@ -11,11 +11,17 @@ def collate_fn(batch: List[Dict]) -> Dict:
     Returns:
         - batch_dict: dictionary with batched tensors and metadata
     """
-    return {
+    result = {
         "images": torch.stack([item["image"] for item in batch]),
         "labels": torch.tensor([item["label"] for item in batch], dtype=torch.long),
         "paths": [item["path"] for item in batch]
     }
+    
+    # Add original images if available
+    if "original_image" in batch[0]:
+        result["original_images"] = [item["original_image"] for item in batch]
+    
+    return result
 
 
 def mixup_collate_fn(batch: List[Dict], alpha: float = 0.2) -> Dict:
@@ -40,13 +46,19 @@ def mixup_collate_fn(batch: List[Dict], alpha: float = 0.2) -> Dict:
         mixed_images = lam * images + (1 - lam) * images[index]
         labels_a, labels_b = labels, labels[index]
         
-        return {
+        result = {
             "images": mixed_images,
             "labels": labels_a,
             "labels_b": labels_b,
             "lam": lam,
             "paths": paths
         }
+        
+        # Add original images if available
+        if "original_image" in batch[0]:
+            result["original_images"] = [item["original_image"] for item in batch]
+        
+        return result
     else:
         return collate_fn(batch)
 
@@ -96,13 +108,19 @@ def cutmix_collate_fn(batch: List[Dict], alpha: float = 1.0) -> Dict:
         # Adjust lambda to the exact area ratio
         lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (W * H))
         
-        return {
+        result = {
             "images": images,
             "labels": labels_a,
             "labels_b": labels_b,
             "lam": lam,
             "paths": paths
         }
+        
+        # Add original images if available
+        if "original_image" in batch[0]:
+            result["original_images"] = [item["original_image"] for item in batch]
+        
+        return result
     else:
         return collate_fn(batch)
 

@@ -16,7 +16,8 @@ class BaseDataset(Dataset):
         image_paths: List[Tuple[Path, int]], 
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
-        cache_images: bool = False
+        cache_images: bool = False,
+        return_original: bool = False
     ):
         """
         Initialize BaseDataset
@@ -25,11 +26,13 @@ class BaseDataset(Dataset):
             - transform: optional transform to apply to images
             - target_transform: optional transform to apply to labels
             - cache_images: whether to cache loaded images in memory
+            - return_original: whether to return original image along with transformed image
         """
         self.image_paths = image_paths
         self.transform = transform
         self.target_transform = target_transform
         self.cache_images = cache_images
+        self.return_original = return_original
         self.image_cache = {} if cache_images else None
         
         # Validate all paths exist
@@ -62,7 +65,7 @@ class BaseDataset(Dataset):
         Args:
             - idx: index of item to retrieve
         Returns:
-            - sample: dictionary containing image, label, path, and original_image
+            - sample: dictionary containing image, label, path, and optionally original_image
         """
         img_path, label = self.image_paths[idx]
         
@@ -79,7 +82,8 @@ class BaseDataset(Dataset):
                 # Return a dummy black image in case of error
                 image = Image.new('RGB', (224, 224), (0, 0, 0))
         
-        original_image = image.copy() if hasattr(image, 'copy') else image
+        if self.return_original:
+            original_image = image.copy() if hasattr(image, 'copy') else image
         
         if self.transform:
             image = self.transform(image)
@@ -87,12 +91,16 @@ class BaseDataset(Dataset):
         if self.target_transform:
             label = self.target_transform(label)
 
-        return {
+        sample = {
             "image": image,
             "label": label,
-            "path": str(img_path),
-            "original_image": original_image
+            "path": str(img_path)
         }
+        
+        if self.return_original:
+            sample["original_image"] = original_image
+            
+        return sample
     
     def get_class_distribution(self) -> Dict[int, int]:
         """

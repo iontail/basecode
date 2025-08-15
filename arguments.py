@@ -66,6 +66,8 @@ def parse_arguments():
                         help='Use balanced sampling for imbalanced datasets')
     parser.add_argument('--memory_efficient', action='store_true', default=False,
                         help='Use memory efficient dataset loading')
+    parser.add_argument('--return_original', action='store_true', default=False,
+                        help='Return original image along with transformed image')
 
     # Model architecture arguments
     parser.add_argument('--model', type=str, default='unet',

@@ -118,6 +118,30 @@ class MainTrainer(BaseTrainer):
 - Learning rate scheduling
 - Early stopping
 
+
+## 📋 Development Guidelines
+
+### Weight Initialization
+
+**IMPORTANT**: All custom layer classes must implement an `init_weights()` method.
+
+```python
+class CustomLayer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.linear = nn.Linear(in_features, out_features)
+    
+    def init_weights(self):
+        """Initialize weights for this layer"""
+        nn.init.xavier_uniform_(self.linear.weight)
+        nn.init.constant_(self.linear.bias, 0)
+    
+    def forward(self, x):
+        return self.linear(x)
+```
+
+The trainer automatically calls `model.initialize_weights()` during setup, which finds and executes all `init_weights()` methods in your model layers.
+
 ## 🐛 Issues & Support
 
 Found a bug or have questions? Please contact me at **leechanhye@g.skku.edu**

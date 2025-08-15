@@ -20,12 +20,12 @@ This is a modular PyTorch deep learning research template designed for rapid pro
 
 ### Core Structure
 - **Base Trainer System**: `src/trainer/base_trainer.py` contains `BaseTrainer` - an abstract class that provides comprehensive training infrastructure including mixed precision, logging, checkpointing, and early stopping
-- **Abstract Model Interface**: Models inherit from `BaseModel` (in `src/models/base_models.py`) and must implement `forward()`, `inference()`, and `dim` property
+- **Abstract Model Interface**: Models inherit from `BaseModel` (in `src/models/base_models.py`) and must implement `forward()`, `dim` property, and `init_weights()` method
 - **Configuration System**: Uses `arguments.py` for CLI arguments + `config/config.py` for dataset-specific configurations (means, stds, class counts)
 - **Data Pipeline**: `src/data/` contains modular dataset loading, collation, and preprocessing utilities
 
 ### Key Files to Customize for New Projects
-1. `src/models/model.py` - Implement your model architecture inheriting from BaseModel
+1. `src/models/model.py` - Implement your model architecture inheriting from BaseModel (must implement `init_weights()` method)
 2. `src/trainer/main_trainer.py` - Create task-specific trainer inheriting from BaseTrainer
 3. `src/data/dataset.py` - Define custom dataset classes
 4. `config/config.py` - Add dataset configurations (num_classes, normalization values, etc.)
@@ -66,6 +66,8 @@ The system uses a comprehensive argument parser that automatically handles:
 ## Implementation Pattern for New Tasks
 
 1. **Define Your Model**: Inherit from `BaseModel` in `src/models/model.py`
+   - Must implement abstract methods: `forward()`, `dim` property, and `init_weights()`
+   - The `init_weights()` method is automatically called during model initialization
 2. **Create Custom Trainer**: Inherit from `BaseTrainer` and implement:
    - `get_criterion()` - Define loss function(s) (single/tuple/list/dict)
    - `train_epoch(train_loader)` - Training loop logic with data loader parameter
@@ -88,6 +90,7 @@ The system uses a comprehensive argument parser that automatically handles:
 - **Data Augmentation**: AutoAugment, CutMix, Mixup pipeline support
 - **Model Compilation**: PyTorch 2.0+ optimization
 - **Reproducibility**: Comprehensive seed setting and deterministic controls
+- **Automatic Weight Initialization**: All models must implement `init_weights()` method for proper initialization
 
 ## Checkpointing System
 

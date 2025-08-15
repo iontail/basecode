@@ -1,19 +1,25 @@
 import torch
 import torch.nn as nn
+from .base_models import BaseModel
 
-class conv1dBLC(nn.Conv1d):
+class conv1dBLC(BaseModel, nn.Conv1d):
     """
     1D Convolution layer that automatically handles BLC (Batch, Length, Channel) format
     Converts BLC to BCL if needed before applying convolution
     """
     def __init__(self, *args, **kwargs):
-        """
-        Initialize conv1dBLC layer
-        Args:
-            - *args: arguments for nn.Conv1d
-            - **kwargs: keyword arguments for nn.Conv1d
-        """
-        super().__init__(*args, **kwargs)
+        nn.Conv1d.__init__(self, *args, **kwargs)
+        
+    @property
+    def dim(self) -> int:
+        return self.out_channels
+        
+        
+    def init_weights(self) -> None:
+        """Initialize weights for conv1dBLC"""
+        nn.init.kaiming_normal_(self.weight, mode='fan_out', nonlinearity='relu')
+        if self.bias is not None:
+            nn.init.constant_(self.bias, 0)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -32,19 +38,24 @@ class conv1dBLC(nn.Conv1d):
         return super().forward(x) 
 
 
-class conv2dBLC(nn.Conv2d):
+class conv2dBLC(BaseModel, nn.Conv2d):
     """
     2D Convolution layer that automatically handles BHWC format
     Converts BHWC to BCHW if needed before applying convolution
     """
     def __init__(self, *args, **kwargs):
-        """
-        Initialize conv2dBLC layer
-        Args:
-            - *args: arguments for nn.Conv2d
-            - **kwargs: keyword arguments for nn.Conv2d
-        """
-        super().__init__(*args, **kwargs)
+        nn.Conv2d.__init__(self, *args, **kwargs)
+        
+    @property
+    def dim(self) -> int:
+        return self.out_channels
+        
+        
+    def init_weights(self) -> None:
+        """Initialize weights for conv2dBLC"""
+        nn.init.kaiming_normal_(self.weight, mode='fan_out', nonlinearity='relu')
+        if self.bias is not None:
+            nn.init.constant_(self.bias, 0)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -63,19 +74,24 @@ class conv2dBLC(nn.Conv2d):
         return super().forward(x)
 
     
-class linearBLC(nn.Linear):
+class linearBLC(BaseModel, nn.Linear):
     """
     Linear layer that automatically handles feature dimension placement
     Supports features in last dimension or second dimension
     """
     def __init__(self, *args, **kwargs):
-        """
-        Initialize linearBLC layer
-        Args:
-            - *args: arguments for nn.Linear
-            - **kwargs: keyword arguments for nn.Linear
-        """
-        super().__init__(*args, **kwargs)
+        nn.Linear.__init__(self, *args, **kwargs)
+        
+    @property
+    def dim(self) -> int:
+        return self.out_features
+        
+        
+    def init_weights(self) -> None:
+        """Initialize weights for linearBLC"""
+        nn.init.xavier_uniform_(self.weight)
+        if self.bias is not None:
+            nn.init.constant_(self.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

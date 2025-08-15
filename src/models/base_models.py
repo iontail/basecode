@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from typing import Any, Dict, Optional, Tuple, Union, List
+from typing import Any, Dict, Optional, Tuple, Union, List, Callable
 from abc import abstractmethod, ABC
 
 class BaseModel(nn.Module, ABC):
@@ -41,15 +41,12 @@ class BaseModel(nn.Module, ABC):
         """
         pass
     
+    
     @abstractmethod
-    @torch.no_grad()
-    def inference(self, x: torch.Tensor) -> torch.Tensor:
+    def init_weights(self) -> None:
         """
-        Inference pass through the model without gradient computation
-        Args:
-            - x: input tensor
-        Returns:
-            - output: model inference output tensor
+        Initialize weights for the model
+        This method must be implemented by all models inheriting from BaseModel
         """
         pass
 
@@ -164,4 +161,25 @@ class BaseModel(nn.Module, ABC):
             - params: list of trainable parameters
         """
         return [p for p in self.parameters() if p.requires_grad]
+    
+    def initialize_weights(self) -> 'BaseModel':
+        """
+        Initialize weights by calling init_weights method on all modules that have it
+        Returns:
+            - self: BaseModel instance for method chaining
+        """
+        print("Initializing model weights...")
+        for name, module in self.named_modules():
+            if hasattr(module, 'init_weights') and callable(getattr(module, 'init_weights')):
+                module.init_weights()
+                print(f"Applied initialization to layer: {name}")
+        return self
+    
+    def print_layer_info(self) -> None:
+        """Print information about all layers in the model"""
+        print("Model Layer Information:")
+        print("-" * 50)
+        for name, module in self.named_modules():
+            if len(list(module.children())) == 0:  # Only leaf modules
+                print(f"{name:<30} {type(module).__name__}")
     

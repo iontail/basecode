@@ -128,7 +128,11 @@ def create_dataloader(
     
     # Choose dataset type based on memory efficiency setting
     dataset_class = MemoryEfficientDataset if getattr(args, 'memory_efficient', False) else CustomDataset
-    dataset = dataset_class(image_paths, transform=transform)
+    dataset = dataset_class(
+        image_paths, 
+        transform=transform,
+        return_original=getattr(args, 'return_original', False)
+    )
     
     # Create sampler for balanced sampling if requested
     sampler = None
@@ -264,9 +268,21 @@ def create_split_dataloaders(args):
     
     dataset_class = MemoryEfficientDataset if getattr(args, 'memory_efficient', False) else CustomDataset
     
-    train_dataset = dataset_class(train_paths, transform=train_transform)
-    val_dataset = dataset_class(val_paths, transform=val_transform)
-    test_dataset = dataset_class(test_paths, transform=val_transform)
+    train_dataset = dataset_class(
+        train_paths, 
+        transform=train_transform,
+        return_original=getattr(args, 'return_original', False)
+    )
+    val_dataset = dataset_class(
+        val_paths, 
+        transform=val_transform,
+        return_original=getattr(args, 'return_original', False)
+    )
+    test_dataset = dataset_class(
+        test_paths, 
+        transform=val_transform,
+        return_original=getattr(args, 'return_original', False)
+    )
     
     # Create dataloaders
     train_loader = DataLoader(

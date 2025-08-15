@@ -6,17 +6,13 @@ from typing import List
 from base_models import BaseModel
 
 
-class ResidualLayer(nn.Module):
+class ResidualLayer(BaseModel):
     """
     Residual block with two convolutional layers and skip connection
     """
     def __init__(self, channels: int):
-        """
-        Initialize ResidualLayer
-        Args:
-            - channels: number of input/output channels
-        """
         super().__init__()
+        self.channels = channels
         self.block1 = nn.Sequential(
             nn.SiLU(),
             nn.BatchNorm2d(channels),
@@ -27,6 +23,22 @@ class ResidualLayer(nn.Module):
             nn.BatchNorm2d(channels),
             nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         )
+        
+    @property
+    def dim(self) -> int:
+        return self.channels
+        
+        
+    def init_weights(self):
+        """Initialize weights for ResidualLayer"""
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+            elif isinstance(module, nn.BatchNorm2d):
+                nn.init.constant_(module.weight, 1)
+                nn.init.constant_(module.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -42,21 +54,28 @@ class ResidualLayer(nn.Module):
         return x + res
 
 
-class Encoder(nn.Module):
+class Encoder(BaseModel):
     """
     Encoder block with residual layers followed by downsampling
     """
     def __init__(self, in_ch: int, out_ch: int, num_res_blocks: int):
-        """
-        Initialize Encoder
-        Args:
-            - in_ch: number of input channels
-            - out_ch: number of output channels
-            - num_res_blocks: number of residual blocks
-        """
         super().__init__()
+        self.out_ch = out_ch
         self.res_blocks = nn.Sequential(*[ResidualLayer(in_ch) for _ in range(num_res_blocks)])
         self.downsample = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=2, padding=1)
+        
+    @property
+    def dim(self) -> int:
+        return self.out_ch
+        
+        
+    def init_weights(self):
+        """Initialize weights for Encoder"""
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -71,19 +90,23 @@ class Encoder(nn.Module):
         return x
 
 
-class Midcoder(nn.Module):
+class Midcoder(BaseModel):
     """
     Middle processing block with residual layers
     """
     def __init__(self, channels: int, num_res_blocks: int):
-        """
-        Initialize Midcoder
-        Args:
-            - channels: number of channels
-            - num_res_blocks: number of residual blocks
-        """
         super().__init__()
+        self.channels = channels
         self.res_blocks = nn.Sequential(*[ResidualLayer(channels) for _ in range(num_res_blocks)])
+        
+    @property
+    def dim(self) -> int:
+        return self.channels
+        
+        
+    def init_weights(self):
+        """Initialize weights for Midcoder"""
+        pass  # ResidualLayers will handle their own initialization
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -96,24 +119,31 @@ class Midcoder(nn.Module):
         return self.res_blocks(x)
 
 
-class Decoder(nn.Module):
+class Decoder(BaseModel):
     """
     Decoder block with upsampling followed by residual layers
     """
     def __init__(self, in_ch: int, out_ch: int, num_res_blocks: int):
-        """
-        Initialize Decoder
-        Args:
-            - in_ch: number of input channels
-            - out_ch: number of output channels
-            - num_res_blocks: number of residual blocks
-        """
         super().__init__()
+        self.out_ch = out_ch
         self.upsample = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
             nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1)
         )
         self.res_blocks = nn.Sequential(*[ResidualLayer(out_ch) for _ in range(num_res_blocks)])
+        
+    @property
+    def dim(self) -> int:
+        return self.out_ch
+        
+        
+    def init_weights(self):
+        """Initialize weights for Decoder"""
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -162,6 +192,17 @@ class UNet(BaseModel):
         self.final_conv = nn.Conv2d(channels[0], 1, kernel_size=3, padding=1)
         
         self.hidden_dim = channels[0]
+        
+    def init_weights(self):
+        """Initialize weights for UNet"""
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+            elif isinstance(module, nn.BatchNorm2d):
+                nn.init.constant_(module.weight, 1)
+                nn.init.constant_(module.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -187,15 +228,6 @@ class UNet(BaseModel):
 
         return self.final_conv(x)
     
-    def inference(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Inference pass through U-Net
-        Args:
-            - x: input tensor (batch_size, 1, height, width)
-        Returns:
-            - output: reconstructed tensor (batch_size, 1, height, width)
-        """
-        return self.forward(x)
     
     @property
     def dim(self) -> int:
