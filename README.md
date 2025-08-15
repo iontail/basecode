@@ -1,151 +1,131 @@
-# 🔬 PyTorch Research Template
+# 🔬 PyTorch Deep Learning Framework
 
-A clean, modular template for deep learning research. Get started quickly with computer vision, audio, or multimodal projects.
+Modular PyTorch template for deep learning research with comprehensive training infrastructure, data pipeline, and experiment management.
 
 ## 🚀 Quick Start
 
-### 1. Setup Environment
+### Setup
 
 ```bash
-# Clone repository
 git clone https://github.com/iontail/basecode.git
 cd basecode
 
-# Option 1: UV (Recommended)
-pip install uv
-uv sync
-source .venv/bin/activate
+# UV (recommended)
+pip install uv && uv sync && source .venv/bin/activate
 
-# Option 2: Conda
+# Or Conda
 conda create -n basecode python=3.12
 conda activate basecode
 pip install -r requirements.txt
 ```
 
-### 2. Customize for Your Research
+### Key Files
 
-Edit these key files:
+| File | Purpose |
+|------|----------|
+| `src/models/model.py` | Model architecture |
+| `src/data/dataset.py` | Dataset & preprocessing |
+| `src/trainer/main_trainer.py` | Training logic |
+| `arguments.py` | CLI arguments |
 
-| File | What to Change |
-|------|----------------|
-| `src/models/model.py` | Your model architecture |
-| `src/data/dataset.py` | Dataset loading & preprocessing |
-| `src/trainer/main_trainer.py` | Training loop logic |
-| `arguments.py` | Add your hyperparameters |
-
-### 3. Run Training
+### Usage
 
 ```bash
-# UV environment
-uv run python train.py --train_data_dir ./your_dataset --epochs 100
-uv run python test.py --weights ./checkpoints/best_model.pth
+# Training
+python train.py --data_path ./dataset --epochs 100 --batch_size 32
 
-# Traditional environment
-python train.py --train_data_dir ./your_dataset --epochs 100
+# Testing
 python test.py --weights ./checkpoints/best_model.pth
 ```
 
-## 📁 Project Structure
+## 📁 Structure
 
 ```
 src/
-├── data/           # Dataset & data loading
-├── models/         # Model definitions
-├── trainer/        # Training logic
-└── utils/          # Logging, metrics, etc.
+├── data/           # Dataset, loading, preprocessing
+├── models/         # Model architectures
+├── trainer/        # Training infrastructure  
+└── utils/          # Utilities, metrics
 
-train.py           # Training entry point
-test.py            # Evaluation entry point
+train.py           # Training entry
+test.py            # Evaluation entry
 arguments.py       # CLI arguments
 ```
 
-## 🛠️ Implementation Guide
+## 🛠️ Implementation
 
-### 1. Define Your Model
+### Model
 ```python
-# src/models/model.py
 from .base_models import BaseModel
 
 class YourModel(BaseModel):
-    def forward(self, x):
-        # Your forward pass
-        return output
-```
-
-### 2. Create Dataset Class
-```python
-# src/data/dataset.py
-from torch.utils.data import Dataset
-
-class YourDataset(Dataset):
-    def __init__(self, data_dir):
-        # Load your data
+    def init_weights(self):
+        # Required: initialize weights
         pass
     
-    def __getitem__(self, idx):
-        # Return sample
-        return data, label
+    @property
+    def dim(self):
+        # Required: output dimension
+        return self.output_dim
+    
+    def forward(self, x):
+        return self.layers(x)
 ```
 
-### 3. Customize Training
+### Trainer
 ```python
-# src/trainer/main_trainer.py
 from .base_trainer import BaseTrainer
-import torch.nn as nn
 
 class MainTrainer(BaseTrainer):
     def get_criterion(self):
-        # Define loss function(s): single, tuple, list, or dict
-        return nn.CrossEntropyLoss(label_smoothing=self.args.label_smoothing)
+        return nn.CrossEntropyLoss()
     
     def train_epoch(self, train_loader):
-        # Training logic with data loader as parameter
+        # Training loop
         return {'loss': avg_loss}
     
     def validate_epoch(self, val_loader):
-        # Validation logic with data loader as parameter
+        # Validation loop
         return {'val_loss': avg_val_loss}
 ```
 
 ## ✨ Features
 
-- Mixed precision training (AMP)
-- Flexible data loader parameters
-- Multiple loss function support
-- Automatic checkpointing & resume
-- WandB/TensorBoard logging
-- Multi-GPU support
-- Learning rate scheduling
-- Early stopping
+- **Training**: Mixed precision, multi-GPU, gradient clipping
+- **Scheduling**: Cosine annealing, step, plateau with warmup  
+- **Logging**: WandB, TensorBoard integration
+- **Data**: Advanced augmentations, balanced sampling
+- **Checkpointing**: Best model tracking, resume training
+- **Architecture**: Abstract base classes, modular design
 
+## 📋 Requirements
 
-## 📋 Development Guidelines
+**Models** must inherit from `BaseModel` and implement:
+- `init_weights()`: Weight initialization
+- `dim` property: Output dimension
+- `forward()`: Forward pass
 
-### Weight Initialization
+**Trainers** must inherit from `BaseTrainer` and implement:
+- `get_criterion()`: Loss function(s)
+- `train_epoch()`: Training loop
+- `validate_epoch()`: Validation loop
 
-**IMPORTANT**: All custom layer classes must implement an `init_weights()` method.
+## 🔧 Examples
 
-```python
-class CustomLayer(nn.Module):
-    def __init__(self, in_features, out_features):
-        super().__init__()
-        self.linear = nn.Linear(in_features, out_features)
-    
-    def init_weights(self):
-        """Initialize weights for this layer"""
-        nn.init.xavier_uniform_(self.linear.weight)
-        nn.init.constant_(self.linear.bias, 0)
-    
-    def forward(self, x):
-        return self.linear(x)
+```bash
+# Basic training
+python train.py --data_path ./dataset --epochs 100
+
+# Advanced training
+python train.py --mixed_precision --use_wandb --save_best \
+    --experiment_name "my_exp" --lr 1e-3 --batch_size 64
+
+# Resume training
+python train.py --resume ./checkpoints/best_model.pt
 ```
 
-The trainer automatically calls `model.initialize_weights()` during setup, which finds and executes all `init_weights()` methods in your model layers.
+## 📞 Contact
 
-## 🐛 Issues & Support
+**Issues**: leechanhye@g.skku.edu
 
-Found a bug or have questions? Please contact me at **leechanhye@g.skku.edu**
-
-## 📄 License
-
-Open for research use.
+**License**: Open for research use

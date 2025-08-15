@@ -24,12 +24,14 @@ class ResidualLayer(BaseModel):
             nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         )
         
+        self._initialize_weights()
+        
     @property
     def dim(self) -> int:
         return self.channels
         
         
-    def init_weights(self):
+    def _initialize_weights(self):
         """Initialize weights for ResidualLayer"""
         for module in self.modules():
             if isinstance(module, nn.Conv2d):
@@ -64,12 +66,14 @@ class Encoder(BaseModel):
         self.res_blocks = nn.Sequential(*[ResidualLayer(in_ch) for _ in range(num_res_blocks)])
         self.downsample = nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=2, padding=1)
         
+        self._initialize_weights()
+        
     @property
     def dim(self) -> int:
         return self.out_ch
         
         
-    def init_weights(self):
+    def _initialize_weights(self):
         """Initialize weights for Encoder"""
         for module in self.modules():
             if isinstance(module, nn.Conv2d):
@@ -103,10 +107,6 @@ class Midcoder(BaseModel):
     def dim(self) -> int:
         return self.channels
         
-        
-    def init_weights(self):
-        """Initialize weights for Midcoder"""
-        pass  # ResidualLayers will handle their own initialization
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -132,12 +132,14 @@ class Decoder(BaseModel):
         )
         self.res_blocks = nn.Sequential(*[ResidualLayer(out_ch) for _ in range(num_res_blocks)])
         
+        self._initialize_weights()
+        
     @property
     def dim(self) -> int:
         return self.out_ch
         
         
-    def init_weights(self):
+    def _initialize_weights(self):
         """Initialize weights for Decoder"""
         for module in self.modules():
             if isinstance(module, nn.Conv2d):
@@ -194,7 +196,6 @@ class UNet(BaseModel):
         self.hidden_dim = channels[0]
         
     def init_weights(self):
-        """Initialize weights for UNet"""
         for module in self.modules():
             if isinstance(module, nn.Conv2d):
                 nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')

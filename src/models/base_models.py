@@ -42,13 +42,7 @@ class BaseModel(nn.Module, ABC):
         pass
     
     
-    @abstractmethod
-    def init_weights(self) -> None:
-        """
-        Initialize weights for the model
-        This method must be implemented by all models inheriting from BaseModel
-        """
-        pass
+
 
     def freeze(self, layer_names: Optional[List[str]] = None) -> 'BaseModel':
         """
@@ -121,6 +115,19 @@ class BaseModel(nn.Module, ABC):
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return total, trainable
     
+    def initialize_weights(self) -> 'BaseModel':
+        """
+        Initialize weights by calling init_weights method on all modules that have it
+        Returns:
+            - self: BaseModel instance for method chaining
+        """
+        print("Initializing model weights...")
+        for name, module in self.named_modules():
+            if hasattr(module, 'init_weights') and callable(getattr(module, 'init_weights')):
+                module.init_weights()
+                print(f"Applied initialization to layer: {name}")
+        return self
+    
     def get_device(self) -> torch.device:
         """
         Get the device where the model is currently located
@@ -162,18 +169,6 @@ class BaseModel(nn.Module, ABC):
         """
         return [p for p in self.parameters() if p.requires_grad]
     
-    def initialize_weights(self) -> 'BaseModel':
-        """
-        Initialize weights by calling init_weights method on all modules that have it
-        Returns:
-            - self: BaseModel instance for method chaining
-        """
-        print("Initializing model weights...")
-        for name, module in self.named_modules():
-            if hasattr(module, 'init_weights') and callable(getattr(module, 'init_weights')):
-                module.init_weights()
-                print(f"Applied initialization to layer: {name}")
-        return self
     
     def print_layer_info(self) -> None:
         """Print information about all layers in the model"""
