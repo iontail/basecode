@@ -20,7 +20,20 @@ except ImportError:
 
 
 class BaseTrainer(ABC):
+    """
+    Abstract base trainer providing comprehensive training infrastructure
+    including mixed precision, logging, checkpointing, and early stopping
+    """
     def __init__(self, model: nn.Module, args, train_loader=None, val_loader=None, test_loader=None):
+        """
+        Initialize BaseTrainer
+        Args:
+            - model: PyTorch model to train
+            - args: training arguments/configuration
+            - train_loader: training data loader (optional)
+            - val_loader: validation data loader (optional) 
+            - test_loader: test data loader (optional)
+        """
         self.model = model
         self.args = args
         self.device = self._setup_device()
@@ -56,6 +69,11 @@ class BaseTrainer(ABC):
         self._setup_multigpu()
     
     def _setup_device(self) -> torch.device:
+        """
+        Setup device (CPU/CUDA/MPS) based on availability and args
+        Returns:
+            - device: torch device for model and data
+        """
         if self.args.device == 'auto':
             if torch.cuda.is_available():
                 device = torch.device('cuda')
@@ -70,6 +88,9 @@ class BaseTrainer(ABC):
         return device
     
     def _setup_reproducibility(self):
+        """
+        Setup reproducibility by setting seeds and deterministic behavior
+        """
         if self.args.seed is not None:
             random.seed(self.args.seed)
             np.random.seed(self.args.seed)
@@ -83,10 +104,16 @@ class BaseTrainer(ABC):
                 torch.backends.cudnn.benchmark = True
     
     def _setup_directories(self):
+        """
+        Create necessary directories for saving models and logs
+        """
         os.makedirs(self.args.save_dir, exist_ok=True)
         os.makedirs(self.args.log_dir, exist_ok=True)
     
     def _setup_logging(self):
+        """
+        Setup logging with TensorBoard and/or Weights & Biases
+        """
         if self.args.use_tensorboard:
             log_path = os.path.join(self.args.log_dir, self.args.experiment_name)
             self.writer = SummaryWriter(log_path)
@@ -99,6 +126,9 @@ class BaseTrainer(ABC):
             )
     
     def _setup_multigpu(self):
+        """
+        Setup multi-GPU training and model compilation
+        """
         if self.args.use_multigpu and torch.cuda.device_count() > 1:
             print(f"Using {torch.cuda.device_count()} GPUs")
             self.model = nn.DataParallel(self.model)
@@ -108,6 +138,11 @@ class BaseTrainer(ABC):
     
     
     def get_optimizer(self) -> torch.optim.Optimizer:
+        """
+        Create optimizer based on configuration
+        Returns:
+            - optimizer: configured PyTorch optimizer
+        """
         params = self.model.parameters()
         
         if self.args.optimizer == 'Adam':
@@ -144,6 +179,13 @@ class BaseTrainer(ABC):
         return optimizer
     
     def get_scheduler(self, optimizer) -> Optional[torch.optim.lr_scheduler._LRScheduler]:
+        """
+        Create learning rate scheduler based on configuration
+        Args:
+            - optimizer: PyTorch optimizer
+        Returns:
+            - scheduler: configured learning rate scheduler or None
+        """
         if not hasattr(self.args, 'scheduler') or self.args.scheduler == 'none':
             return None
         elif self.args.scheduler == 'cosine':
@@ -164,6 +206,13 @@ class BaseTrainer(ABC):
             raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
     
     def save_checkpoint(self, filepath: str, is_best: bool = False, additional_info: Dict[str, Any] = None):
+        """
+        Save model checkpoint with training state
+        Args:
+            - filepath: path to save checkpoint
+            - is_best: whether this is the best model so far
+            - additional_info: additional information to save in checkpoint
+        """
         # Handle DataParallel models
         model_state = self.model.module.state_dict() if hasattr(self.model, 'module') else self.model.state_dict()
         
@@ -192,6 +241,14 @@ class BaseTrainer(ABC):
         self._cleanup_checkpoints()
     
     def load_checkpoint(self, filepath: str, load_optimizer: bool = True):
+        """
+        Load model checkpoint and training state
+        Args:
+            - filepath: path to checkpoint file
+            - load_optimizer: whether to load optimizer state
+        Returns:
+            - checkpoint: loaded checkpoint dictionary
+        """
         checkpoint = torch.load(filepath, map_location=self.device)
         
         # Handle DataParallel models
@@ -217,6 +274,12 @@ class BaseTrainer(ABC):
         return checkpoint
     
     def log_metrics(self, metrics: Dict[str, Dict[str, float]], epoch: Optional[int] = None):
+        """
+        Log metrics to console, TensorBoard, and/or WandB
+        Args:
+            - metrics: nested dictionary of metrics {phase: {metric_name: value}}
+            - epoch: current epoch number (defaults to self.current_epoch)
+        """
         if epoch is None:
             epoch = self.current_epoch
 
@@ -249,6 +312,9 @@ class BaseTrainer(ABC):
                 wandb.log({'learning_rate': current_lr}, step=epoch)
     
     def model_summary(self):
+        """
+        Print comprehensive model summary including parameters and memory usage
+        """
         total_params = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         
@@ -262,6 +328,13 @@ class BaseTrainer(ABC):
         print(f"Model size: {size_mib:.2f} MiB ({size_bytes:,} bytes)")
     
     def model_size_b(self, model: nn.Module) -> int:
+        """
+        Calculate model size in bytes including parameters and buffers
+        Args:
+            - model: PyTorch model
+        Returns:
+            - size: model size in bytes
+        """
         size = 0
         for param in model.parameters():
             size += param.nelement() * param.element_size()
@@ -270,10 +343,15 @@ class BaseTrainer(ABC):
         return size
     
     def train(self):
+        """
+        Main training loop with validation, checkpointing, and early stopping
+        """
         self.optimizer = self.get_optimizer()
         self.scheduler = self.get_scheduler(self.optimizer)
-        self.criterion = self.get_criterion()
-        
+
+        # Loss functions (can be multiple)
+        self.criteria = self.get_criterion()
+
         if hasattr(self.args, 'resume') and self.args.resume:
             _ = self.load_checkpoint(self.args.resume, load_optimizer=True)
 
@@ -288,11 +366,11 @@ class BaseTrainer(ABC):
             self.current_epoch = epoch + 1
             
             # Training phase
-            train_metrics = self.train_epoch()
+            train_metrics = self.train_epoch(self.train_loader)
             
             # Validation phase
             if epoch % eval_freq == 0:
-                val_metrics = self.validate_epoch()
+                val_metrics = self.validate_epoch(self.val_loader)
             else:
                 val_metrics = {}
             
@@ -340,32 +418,65 @@ class BaseTrainer(ABC):
         print("Training completed!")
     
     @abstractmethod
-    def get_criterion(self) -> nn.Module:
-        """Return the loss criterion for training."""
+    def get_criterion(self):
+        """
+        Return the loss criteria for training
+        Can return:
+            - Single loss function (nn.Module)
+            - Tuple of loss functions (nn.Module, nn.Module, ...)
+            - Dict of loss functions {'loss_name': nn.Module, ...}
+            - List of loss functions [nn.Module, nn.Module, ...]
+        """
         pass
     
     @abstractmethod
-    def train_epoch(self) -> Dict[str, float]:
-        """Execute one training epoch and return training metrics."""
+    def train_epoch(self, train_loader) -> Dict[str, float]:
+        """
+        Execute one training epoch and return training metrics
+        Args:
+            - train_loader: training data loader
+        Returns:
+            - metrics: dictionary of training metrics
+        """
         pass
     
     @abstractmethod
-    def validate_epoch(self) -> Dict[str, float]:
-        """Execute validation and return validation metrics."""
+    def validate_epoch(self, val_loader) -> Dict[str, float]:
+        """
+        Execute validation and return validation metrics
+        Args:
+            - val_loader: validation data loader
+        Returns:
+            - metrics: dictionary of validation metrics
+        """
         pass
     
     @abstractmethod
     def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass through model and compute loss. Return (loss, predictions)."""
+        """
+        Forward pass through model and compute loss
+        Args:
+            - batch: batch of data from data loader
+        Returns:
+            - tuple: (loss, predictions)
+        """
         pass
     
     @abstractmethod
     def inference(self, batch) -> torch.Tensor:
-        """Run inference without gradient computation. Return predictions."""
+        """
+        Run inference without gradient computation
+        Args:
+            - batch: batch of data from data loader
+        Returns:
+            - predictions: model predictions
+        """
         pass
     
     def _cleanup_checkpoints(self):
-        """Remove old checkpoints if exceeding keep_checkpoint_max"""
+        """
+        Remove old checkpoints if exceeding keep_checkpoint_max limit
+        """
         if not hasattr(self.args, 'keep_checkpoint_max') or self.args.keep_checkpoint_max <= 0:
             return
         
@@ -382,20 +493,30 @@ class BaseTrainer(ABC):
                 print(f"Removed old checkpoint: {os.path.basename(filepath)}")
     
     def get_lr(self) -> float:
-        """Get current learning rate"""
+        """
+        Get current learning rate from optimizer
+        Returns:
+            - lr: current learning rate
+        """
         if self.optimizer:
             return self.optimizer.param_groups[0]['lr']
         return 0.0
     
     def clip_gradients(self):
-        """Clip gradients if grad_clip is specified"""
+        """
+        Clip gradients if grad_clip is specified in args
+        """
         if hasattr(self.args, 'grad_clip') and self.args.grad_clip > 0:
             if self.scaler:
                 self.scaler.unscale_(self.optimizer)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
     
     def mixed_precision_step(self, loss: torch.Tensor):
-        """Perform optimization step with mixed precision support"""
+        """
+        Perform optimization step with mixed precision support
+        Args:
+            - loss: computed loss tensor
+        """
         if self.scaler:
             self.scaler.scale(loss).backward()
             self.clip_gradients()

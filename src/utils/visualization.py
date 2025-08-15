@@ -8,7 +8,15 @@ from pathlib import Path
 
 
 def denormalize_tensor(tensor: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
-    """Denormalize a tensor using mean and std"""
+    """
+    Denormalize a tensor using mean and std values
+    Args:
+        - tensor: normalized tensor to denormalize
+        - mean: list of channel means used for normalization
+        - std: list of channel standard deviations used for normalization
+    Returns:
+        - denormalized_tensor: tensor with normalization reversed
+    """
     tensor = tensor.clone()
     for t, m, s in zip(tensor, mean, std):
         t.mul_(s).add_(m)
@@ -16,7 +24,15 @@ def denormalize_tensor(tensor: torch.Tensor, mean: List[float], std: List[float]
 
 
 def tensor_to_image(tensor: torch.Tensor, mean: Optional[List[float]] = None, std: Optional[List[float]] = None):
-    """Convert tensor to numpy image"""
+    """
+    Convert tensor to numpy image array
+    Args:
+        - tensor: image tensor (C, H, W) or (B, C, H, W)
+        - mean: optional channel means for denormalization
+        - std: optional channel standard deviations for denormalization
+    Returns:
+        - image: numpy array in (H, W) or (H, W, C) format
+    """
     if mean is not None and std is not None:
         tensor = denormalize_tensor(tensor, mean, std)
     
@@ -44,7 +60,21 @@ def plot_batch(
     figsize: Tuple[int, int] = (12, 8),
     nrow: int = 4
 ) -> plt.Figure:
-    """Plot a batch of images with labels and predictions"""
+    """
+    Plot a batch of images with labels and predictions in a grid
+    Args:
+        - images: batch of image tensors (B, C, H, W)
+        - labels: optional ground truth labels (B,)
+        - predictions: optional predicted labels (B,)
+        - class_names: optional list of class names for display
+        - mean: optional channel means for denormalization
+        - std: optional channel standard deviations for denormalization
+        - max_images: maximum number of images to display
+        - figsize: figure size tuple (width, height)
+        - nrow: number of images per row in grid
+    Returns:
+        - fig: matplotlib figure object
+    """
     
     # Limit number of images
     if images.size(0) > max_images:
@@ -113,7 +143,17 @@ def plot_training_curves(
     val_metrics: Optional[Dict[str, List[float]]] = None,
     figsize: Tuple[int, int] = (15, 5)
 ) -> plt.Figure:
-    """Plot training curves for losses and metrics"""
+    """
+    Plot training curves for losses and metrics over epochs
+    Args:
+        - train_losses: list of training losses per epoch
+        - val_losses: optional list of validation losses per epoch
+        - train_metrics: optional dictionary of training metrics {metric_name: [values]}
+        - val_metrics: optional dictionary of validation metrics {metric_name: [values]}
+        - figsize: figure size tuple (width, height)
+    Returns:
+        - fig: matplotlib figure object
+    """
     
     n_plots = 1
     if train_metrics:
@@ -161,7 +201,14 @@ def plot_training_curves(
 
 
 def plot_learning_rate(lr_history: List[float], figsize: Tuple[int, int] = (10, 6)) -> plt.Figure:
-    """Plot learning rate schedule"""
+    """
+    Plot learning rate schedule over training epochs
+    Args:
+        - lr_history: list of learning rates per epoch
+        - figsize: figure size tuple (width, height)
+    Returns:
+        - fig: matplotlib figure object
+    """
     fig, ax = plt.subplots(figsize=figsize)
     
     epochs = range(1, len(lr_history) + 1)
@@ -182,7 +229,15 @@ def plot_feature_maps(
     max_channels: int = 16,
     figsize: Tuple[int, int] = (12, 8)
 ) -> plt.Figure:
-    """Plot feature maps from a layer"""
+    """
+    Plot feature maps from a convolutional layer
+    Args:
+        - feature_maps: feature map tensor (B, C, H, W) or (C, H, W)
+        - max_channels: maximum number of channels to visualize
+        - figsize: figure size tuple (width, height)
+    Returns:
+        - fig: matplotlib figure object
+    """
     
     if feature_maps.dim() == 4:
         feature_maps = feature_maps[0]  # Take first sample in batch
@@ -220,7 +275,13 @@ def plot_feature_maps(
 
 
 def save_plot(fig: plt.Figure, save_path: Union[str, Path], dpi: int = 300):
-    """Save plot to file"""
+    """
+    Save matplotlib figure to file
+    Args:
+        - fig: matplotlib figure to save
+        - save_path: path where to save the figure
+        - dpi: resolution for saved figure
+    """
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(save_path, dpi=dpi, bbox_inches='tight')
@@ -231,7 +292,14 @@ def create_model_summary_plot(
     model_params: Dict[str, int],
     figsize: Tuple[int, int] = (10, 6)
 ) -> plt.Figure:
-    """Create a visualization of model parameter distribution"""
+    """
+    Create a visualization of model parameter distribution by layer
+    Args:
+        - model_params: dictionary mapping layer names to parameter counts
+        - figsize: figure size tuple (width, height)
+    Returns:
+        - fig: matplotlib figure object with bar chart and pie chart
+    """
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     

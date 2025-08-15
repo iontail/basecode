@@ -11,18 +11,32 @@ class MetricsCalculator:
     """Calculator for various classification metrics"""
     
     def __init__(self, num_classes: int, class_names: Optional[List[str]] = None):
+        """
+        Initialize MetricsCalculator
+        Args:
+            - num_classes: number of classes in classification task
+            - class_names: optional list of class names for reporting
+        """
         self.num_classes = num_classes
         self.class_names = class_names or [f"Class_{i}" for i in range(num_classes)]
         self.reset()
     
     def reset(self):
-        """Reset all accumulated metrics"""
+        """
+        Reset all accumulated metrics and clear prediction history
+        """
         self.predictions = []
         self.targets = []
         self.probabilities = []
     
     def update(self, preds: torch.Tensor, targets: torch.Tensor, probs: Optional[torch.Tensor] = None):
-        """Update metrics with batch predictions"""
+        """
+        Update metrics with batch predictions
+        Args:
+            - preds: predicted class indices or logits (batch_size,) or (batch_size, num_classes)
+            - targets: ground truth class indices (batch_size,)
+            - probs: prediction probabilities (batch_size, num_classes) (optional)
+        """
         if preds.dim() > 1:
             preds = preds.argmax(dim=1)
         
@@ -35,7 +49,13 @@ class MetricsCalculator:
             self.probabilities.extend(probs.cpu().numpy())
     
     def compute(self, average: str = 'weighted') -> Dict[str, float]:
-        """Compute all metrics"""
+        """
+        Compute all classification metrics
+        Args:
+            - average: averaging method ('weighted', 'macro', 'micro')
+        Returns:
+            - metrics: dictionary of computed metrics
+        """
         if not self.predictions:
             return {}
         
@@ -77,7 +97,11 @@ class MetricsCalculator:
         return metrics
     
     def get_confusion_matrix(self) -> np.ndarray:
-        """Get confusion matrix"""
+        """
+        Get confusion matrix from accumulated predictions
+        Returns:
+            - cm: confusion matrix (num_classes, num_classes)
+        """
         if not self.predictions:
             return np.zeros((self.num_classes, self.num_classes))
         
@@ -88,7 +112,14 @@ class MetricsCalculator:
         )
     
     def plot_confusion_matrix(self, normalize: bool = False, figsize: Tuple[int, int] = (8, 6)) -> plt.Figure:
-        """Plot confusion matrix"""
+        """
+        Plot confusion matrix as heatmap
+        Args:
+            - normalize: whether to normalize confusion matrix
+            - figsize: figure size tuple (width, height)
+        Returns:
+            - fig: matplotlib figure object
+        """
         cm = self.get_confusion_matrix()
         
         if normalize:
@@ -115,7 +146,11 @@ class MetricsCalculator:
         return fig
     
     def classification_report(self) -> str:
-        """Get detailed classification report"""
+        """
+        Get detailed classification report with per-class metrics
+        Returns:
+            - report: formatted classification report string
+        """
         if not self.predictions:
             return "No predictions available"
         
@@ -128,7 +163,15 @@ class MetricsCalculator:
 
 
 def top_k_accuracy(preds: torch.Tensor, targets: torch.Tensor, k: int = 5) -> float:
-    """Calculate top-k accuracy"""
+    """
+    Calculate top-k accuracy
+    Args:
+        - preds: prediction logits or class indices (batch_size, num_classes) or (batch_size,)
+        - targets: ground truth class indices (batch_size,)
+        - k: number of top predictions to consider
+    Returns:
+        - accuracy: top-k accuracy as float
+    """
     if preds.dim() == 1:
         return float(preds.eq(targets).float().mean())
     
@@ -138,7 +181,14 @@ def top_k_accuracy(preds: torch.Tensor, targets: torch.Tensor, k: int = 5) -> fl
 
 
 def calculate_class_weights(targets: List[int], method: str = 'inverse') -> torch.Tensor:
-    """Calculate class weights for imbalanced datasets"""
+    """
+    Calculate class weights for imbalanced datasets
+    Args:
+        - targets: list of target class indices
+        - method: weighting method ('inverse' or 'sqrt_inverse')
+    Returns:
+        - weights: tensor of class weights (num_classes,)
+    """
     from collections import Counter
     
     class_counts = Counter(targets)

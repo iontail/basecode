@@ -67,9 +67,9 @@ The system uses a comprehensive argument parser that automatically handles:
 
 1. **Define Your Model**: Inherit from `BaseModel` in `src/models/model.py`
 2. **Create Custom Trainer**: Inherit from `BaseTrainer` and implement:
-   - `get_criterion()` - Define loss function
-   - `train_epoch()` - Training loop logic
-   - `validate_epoch()` - Validation logic  
+   - `get_criterion()` - Define loss function(s) (single/tuple/list/dict)
+   - `train_epoch(train_loader)` - Training loop logic with data loader parameter
+   - `validate_epoch(val_loader)` - Validation logic with data loader parameter
    - `forward_pass()` - Forward pass with loss computation
    - `inference()` - Inference logic
 3. **Configure Data**: Update `config/config.py` with your dataset parameters
@@ -77,15 +77,17 @@ The system uses a comprehensive argument parser that automatically handles:
 
 ## Training Features
 
-- Mixed precision training (AMP) support
-- Multi-GPU training (DataParallel/DDP) 
-- Comprehensive logging (WandB, TensorBoard)
-- Checkpoint management with best model saving
-- Early stopping with configurable patience
-- Learning rate scheduling (cosine, step, plateau, exponential)
-- Data augmentation pipeline (including AutoAugment, CutMix, Mixup)
-- Model compilation (PyTorch 2.0+) 
-- Reproducibility controls with seed setting
+- **Flexible Architecture**: Data loaders passed as parameters for maximum flexibility
+- **Multiple Loss Support**: Single loss function, tuple/list of losses, or dict of named losses
+- **Mixed Precision**: Automatic FP16 optimization (AMP) support
+- **Multi-GPU Training**: DataParallel/DDP support
+- **Comprehensive Logging**: WandB, TensorBoard integration with real-time metrics
+- **Smart Checkpointing**: Best model tracking, automatic saving, and resume capability
+- **Early Stopping**: Configurable patience with validation-based termination
+- **Advanced Scheduling**: Cosine, step, plateau, exponential LR schedulers
+- **Data Augmentation**: AutoAugment, CutMix, Mixup pipeline support
+- **Model Compilation**: PyTorch 2.0+ optimization
+- **Reproducibility**: Comprehensive seed setting and deterministic controls
 
 ## Checkpointing System
 
@@ -221,3 +223,42 @@ python train.py --model efficientnet_b0 --experiment_name "efficientnet_comparis
 - **Self-supervised Learning**: Learn from unlabeled data
 - **Few-shot Learning**: Adapt to new tasks with minimal data
 - **Meta-learning**: Learn to learn quickly
+
+## Trainer Pattern and Data Flow
+
+### Core Training Loop Architecture
+The training system follows a clean separation of concerns:
+
+```python
+# BaseTrainer handles the orchestration
+def train(self):
+    for epoch in range(epochs):
+        train_metrics = self.train_epoch(self.train_loader)  # Pass loader as parameter
+        val_metrics = self.validate_epoch(self.val_loader)   # Pass loader as parameter
+        self.log_metrics({'train': train_metrics, 'val': val_metrics})
+
+# MainTrainer implements the specifics
+class MainTrainer(BaseTrainer):
+    def train_epoch(self, train_loader):
+        # Your training logic with the provided loader
+        for batch in train_loader:
+            loss, predictions = self.forward_pass(batch)
+            # Training step...
+        return metrics
+```
+
+### Loss Function Flexibility
+The `get_criterion()` method supports multiple patterns:
+- **Single Loss**: `return nn.CrossEntropyLoss()`
+- **Multiple Losses (Tuple)**: `return (nn.CrossEntropyLoss(), nn.MSELoss())`
+- **Multiple Losses (List)**: `return [nn.CrossEntropyLoss(), nn.MSELoss()]`
+- **Named Losses (Dict)**: `return {'classification': nn.CrossEntropyLoss(), 'regression': nn.MSELoss()}`
+
+This flexibility allows for complex training scenarios like multi-task learning or composite loss functions.
+
+### Data Loader Parameter Pattern
+By passing data loaders as parameters rather than using instance variables, the system gains:
+- **Testing Flexibility**: Easy to test with mock data loaders
+- **Runtime Flexibility**: Different loaders for different scenarios (e.g., different augmentation strategies)
+- **Multi-dataset Support**: Switch between datasets within the same training session
+- **Clean Separation**: Training logic is independent of data source specifics

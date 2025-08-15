@@ -91,20 +91,28 @@ class YourDataset(Dataset):
 ```python
 # src/trainer/main_trainer.py
 from .base_trainer import BaseTrainer
+import torch.nn as nn
 
 class MainTrainer(BaseTrainer):
     def get_criterion(self):
-        return nn.CrossEntropyLoss()
+        # Define loss function(s): single, tuple, list, or dict
+        return nn.CrossEntropyLoss(label_smoothing=self.args.label_smoothing)
     
-    def train_epoch(self):
-        # Your training logic
-        pass
+    def train_epoch(self, train_loader):
+        # Training logic with data loader as parameter
+        return {'loss': avg_loss}
+    
+    def validate_epoch(self, val_loader):
+        # Validation logic with data loader as parameter
+        return {'val_loss': avg_val_loss}
 ```
 
 ## ✨ Features
 
 - Mixed precision training (AMP)
-- Automatic checkpointing
+- Flexible data loader parameters
+- Multiple loss function support
+- Automatic checkpointing & resume
 - WandB/TensorBoard logging
 - Multi-GPU support
 - Learning rate scheduling

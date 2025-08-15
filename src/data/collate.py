@@ -4,7 +4,13 @@ import numpy as np
 
 
 def collate_fn(batch: List[Dict]) -> Dict:
-    """Standard collate function for batching"""
+    """
+    Standard collate function for batching dataset samples
+    Args:
+        - batch: list of sample dictionaries from dataset
+    Returns:
+        - batch_dict: dictionary with batched tensors and metadata
+    """
     return {
         "images": torch.stack([item["image"] for item in batch]),
         "labels": torch.tensor([item["label"] for item in batch], dtype=torch.long),
@@ -13,7 +19,14 @@ def collate_fn(batch: List[Dict]) -> Dict:
 
 
 def mixup_collate_fn(batch: List[Dict], alpha: float = 0.2) -> Dict:
-    """Collate function with Mixup data augmentation"""
+    """
+    Collate function with Mixup data augmentation
+    Args:
+        - batch: list of sample dictionaries from dataset
+        - alpha: mixup interpolation parameter
+    Returns:
+        - batch_dict: dictionary with mixed images and dual labels
+    """
     images = torch.stack([item["image"] for item in batch])
     labels = torch.tensor([item["label"] for item in batch], dtype=torch.long)
     paths = [item["path"] for item in batch]
@@ -39,7 +52,14 @@ def mixup_collate_fn(batch: List[Dict], alpha: float = 0.2) -> Dict:
 
 
 def cutmix_collate_fn(batch: List[Dict], alpha: float = 1.0) -> Dict:
-    """Collate function with CutMix data augmentation"""
+    """
+    Collate function with CutMix data augmentation
+    Args:
+        - batch: list of sample dictionaries from dataset
+        - alpha: cutmix strength parameter
+    Returns:
+        - batch_dict: dictionary with cut-mixed images and dual labels
+    """
     images = torch.stack([item["image"] for item in batch])
     labels = torch.tensor([item["label"] for item in batch], dtype=torch.long)
     paths = [item["path"] for item in batch]
@@ -88,7 +108,15 @@ def cutmix_collate_fn(batch: List[Dict], alpha: float = 1.0) -> Dict:
 
 
 def adaptive_collate_fn(batch: List[Dict], augmentation_type: str = "none", **kwargs) -> Dict:
-    """Adaptive collate function that chooses augmentation based on type"""
+    """
+    Adaptive collate function that chooses augmentation based on type
+    Args:
+        - batch: list of sample dictionaries from dataset
+        - augmentation_type: type of augmentation ('none', 'mixup', 'cutmix')
+        - **kwargs: additional arguments for augmentation functions
+    Returns:
+        - batch_dict: dictionary with appropriately augmented batch
+    """
     if augmentation_type == "mixup":
         return mixup_collate_fn(batch, kwargs.get("alpha", 0.2))
     elif augmentation_type == "cutmix":

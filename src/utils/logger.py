@@ -32,6 +32,17 @@ class Logger:
         wandb_entity: Optional[str] = None,
         log_level: str = "INFO"
     ):
+        """
+        Initialize unified logger with multiple backends
+        Args:
+            - log_dir: directory for log files
+            - experiment_name: name of the experiment
+            - use_wandb: whether to enable Weights & Biases logging
+            - use_tensorboard: whether to enable TensorBoard logging
+            - wandb_project: W&B project name
+            - wandb_entity: W&B entity name
+            - log_level: logging level (DEBUG, INFO, WARNING, ERROR)
+        """
         self.log_dir = Path(log_dir)
         self.experiment_name = experiment_name
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -57,7 +68,11 @@ class Logger:
         logging.info(f"Tensorboard enabled: {self.tensorboard_enabled}")
     
     def _setup_file_logging(self, log_level: str):
-        """Setup file logging"""
+        """
+        Setup file and console logging handlers
+        Args:
+            - log_level: logging level string
+        """
         log_file = self.log_dir / f"{self.experiment_name}.log"
         
         # Create formatter
@@ -83,7 +98,12 @@ class Logger:
         root_logger.addHandler(console_handler)
     
     def _setup_wandb(self, project: Optional[str], entity: Optional[str]):
-        """Setup Weights & Biases logging"""
+        """
+        Setup Weights & Biases logging
+        Args:
+            - project: W&B project name
+            - entity: W&B entity name
+        """
         try:
             wandb.init(
                 project=project or "deep-learning-research",
@@ -96,7 +116,9 @@ class Logger:
             self.wandb_enabled = False
     
     def _setup_tensorboard(self):
-        """Setup TensorBoard logging"""
+        """
+        Setup TensorBoard logging writer
+        """
         try:
             tb_log_dir = self.log_dir / "tensorboard" / self.experiment_name
             self.tb_writer = SummaryWriter(str(tb_log_dir))
@@ -105,7 +127,13 @@ class Logger:
             self.tensorboard_enabled = False
     
     def log_metrics(self, metrics: Dict[str, float], step: int, prefix: str = ""):
-        """Log metrics to all enabled loggers"""
+        """
+        Log metrics to all enabled backends
+        Args:
+            - metrics: dictionary of metric names to values
+            - step: training step/epoch number
+            - prefix: optional prefix for metric names
+        """
         
         # Add to history
         for key, value in metrics.items():
@@ -131,7 +159,11 @@ class Logger:
         logging.info(f"Step {step} | {prefix_str}{metric_str}")
     
     def log_hyperparameters(self, hparams: Dict[str, Any]):
-        """Log hyperparameters"""
+        """
+        Log hyperparameters to file and enabled backends
+        Args:
+            - hparams: dictionary of hyperparameter names to values
+        """
         
         # Save to file
         hparams_file = self.log_dir / f"{self.experiment_name}_hparams.json"
@@ -149,7 +181,11 @@ class Logger:
         logging.info("Hyperparameters logged")
     
     def log_model_summary(self, model_summary: str):
-        """Log model architecture summary"""
+        """
+        Log model architecture summary to file
+        Args:
+            - model_summary: string representation of model architecture
+        """
         
         # Save to file
         summary_file = self.log_dir / f"{self.experiment_name}_model_summary.txt"
@@ -159,7 +195,14 @@ class Logger:
         logging.info("Model summary saved")
     
     def log_image(self, tag: str, image, step: int, dataformats: str = "CHW"):
-        """Log image to tensorboard and wandb"""
+        """
+        Log image to TensorBoard and W&B
+        Args:
+            - tag: name/tag for the image
+            - image: image tensor or numpy array
+            - step: training step number
+            - dataformats: format of image data (CHW, HWC, etc.)
+        """
         
         if self.tensorboard_enabled:
             self.tb_writer.add_image(tag, image, step, dataformats=dataformats)
@@ -170,13 +213,25 @@ class Logger:
             wandb.log({tag: wandb.Image(image)}, step=step)
     
     def log_histogram(self, tag: str, values, step: int):
-        """Log histogram to tensorboard"""
+        """
+        Log histogram to TensorBoard
+        Args:
+            - tag: name/tag for the histogram
+            - values: tensor or array of values
+            - step: training step number
+        """
         
         if self.tensorboard_enabled:
             self.tb_writer.add_histogram(tag, values, step)
     
     def log_text(self, tag: str, text: str, step: int):
-        """Log text to tensorboard and wandb"""
+        """
+        Log text to TensorBoard and W&B
+        Args:
+            - tag: name/tag for the text
+            - text: text content to log
+            - step: training step number
+        """
         
         if self.tensorboard_enabled:
             self.tb_writer.add_text(tag, text, step)
@@ -185,7 +240,9 @@ class Logger:
             wandb.log({tag: text}, step=step)
     
     def save_metrics(self):
-        """Save metrics history to file"""
+        """
+        Save accumulated metrics history to JSON file
+        """
         metrics_file = self.log_dir / f"{self.experiment_name}_metrics.json"
         with open(metrics_file, 'w') as f:
             json.dump(self.metrics_history, f, indent=2)
@@ -193,7 +250,9 @@ class Logger:
         logging.info(f"Metrics saved to {metrics_file}")
     
     def close(self):
-        """Close all loggers"""
+        """
+        Close all logging backends and save final metrics
+        """
         
         if self.tensorboard_enabled:
             self.tb_writer.close()
@@ -209,17 +268,30 @@ class MetricTracker:
     """Simple metric tracker for training"""
     
     def __init__(self, *metric_names: str):
+        """
+        Initialize metric tracker
+        Args:
+            - metric_names: names of metrics to track
+        """
         self.metrics = {name: [] for name in metric_names}
         self.current_values = {}
     
     def update(self, **kwargs):
-        """Update metric values"""
+        """
+        Update current metric values
+        Args:
+            - **kwargs: metric_name=value pairs
+        """
         for name, value in kwargs.items():
             if name in self.metrics:
                 self.current_values[name] = value
     
     def log(self, reset: bool = True):
-        """Log current values and optionally reset"""
+        """
+        Log current values to history and optionally reset
+        Args:
+            - reset: whether to reset current values after logging
+        """
         for name, value in self.current_values.items():
             if name in self.metrics:
                 self.metrics[name].append(value)
@@ -228,7 +300,14 @@ class MetricTracker:
             self.current_values.clear()
     
     def get_average(self, name: str, last_n: Optional[int] = None) -> float:
-        """Get average of last N values"""
+        """
+        Get average of last N values for a metric
+        Args:
+            - name: metric name
+            - last_n: number of recent values to average (None for all)
+        Returns:
+            - average: average value
+        """
         if name not in self.metrics or not self.metrics[name]:
             return 0.0
         
@@ -239,7 +318,14 @@ class MetricTracker:
         return sum(values) / len(values)
     
     def get_best(self, name: str, mode: str = 'min') -> float:
-        """Get best value"""
+        """
+        Get best value for a metric
+        Args:
+            - name: metric name
+            - mode: 'min' or 'max' for best value selection
+        Returns:
+            - best_value: best value found
+        """
         if name not in self.metrics or not self.metrics[name]:
             return float('inf') if mode == 'min' else float('-inf')
         
@@ -247,11 +333,19 @@ class MetricTracker:
         return min(values) if mode == 'min' else max(values)
     
     def get_history(self, name: str) -> list:
-        """Get full history for a metric"""
+        """
+        Get full history for a metric
+        Args:
+            - name: metric name
+        Returns:
+            - history: list of all recorded values
+        """
         return self.metrics.get(name, []).copy()
     
     def reset(self):
-        """Reset all metrics"""
+        """
+        Reset all metrics and current values
+        """
         for name in self.metrics:
             self.metrics[name].clear()
         self.current_values.clear()
@@ -262,7 +356,15 @@ def setup_logging(
     log_level: str = "INFO",
     experiment_name: Optional[str] = None
 ):
-    """Setup basic logging configuration"""
+    """
+    Setup basic logging configuration with file and console handlers
+    Args:
+        - log_dir: directory for log files
+        - log_level: logging level string
+        - experiment_name: optional experiment name (auto-generated if None)
+    Returns:
+        - experiment_name: final experiment name used
+    """
     
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)

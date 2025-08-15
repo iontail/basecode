@@ -18,6 +18,15 @@ class CheckpointManager:
         monitor_metric: str = 'val_loss',
         mode: str = 'min'
     ):
+        """
+        Initialize CheckpointManager
+        Args:
+            - checkpoint_dir: directory to save checkpoints
+            - max_checkpoints: maximum number of regular checkpoints to keep
+            - save_best: whether to save best checkpoint separately
+            - monitor_metric: metric to monitor for best checkpoint
+            - mode: 'min' or 'max' for best metric comparison
+        """
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
@@ -39,7 +48,17 @@ class CheckpointManager:
         is_best: bool = False,
         filename: Optional[str] = None
     ) -> str:
-        """Save a checkpoint"""
+        """
+        Save a checkpoint with model state and training information
+        Args:
+            - state_dict: model and training state dictionary
+            - epoch: current training epoch
+            - metrics: optional dictionary of metrics for this epoch
+            - is_best: whether this is marked as best checkpoint
+            - filename: optional custom filename for checkpoint
+        Returns:
+            - checkpoint_path: path where checkpoint was saved
+        """
         
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -97,7 +116,14 @@ class CheckpointManager:
         checkpoint_path: Optional[str] = None, 
         load_best: bool = False
     ) -> Dict[str, Any]:
-        """Load a checkpoint"""
+        """
+        Load a checkpoint from file
+        Args:
+            - checkpoint_path: specific checkpoint path to load (optional)
+            - load_best: whether to load the best checkpoint
+        Returns:
+            - checkpoint: loaded checkpoint dictionary
+        """
         
         if load_best:
             checkpoint_path = self.checkpoint_dir / "best_checkpoint.pt"
@@ -118,7 +144,11 @@ class CheckpointManager:
         return checkpoint
     
     def get_latest_checkpoint(self) -> Optional[str]:
-        """Get the path to the latest checkpoint"""
+        """
+        Get the path to the latest checkpoint
+        Returns:
+            - path: path to latest checkpoint or None if no checkpoints exist
+        """
         if not self.checkpoint_history:
             # Search directory for checkpoints
             checkpoint_files = list(self.checkpoint_dir.glob("checkpoint_*.pt"))
@@ -134,15 +164,26 @@ class CheckpointManager:
         return latest['path']
     
     def get_best_checkpoint(self) -> Optional[str]:
-        """Get the path to the best checkpoint"""
+        """
+        Get the path to the best checkpoint
+        Returns:
+            - path: path to best checkpoint or None if no best checkpoint exists
+        """
         return self.best_checkpoint_path
     
     def list_checkpoints(self) -> List[Dict[str, Any]]:
-        """List all checkpoints"""
+        """
+        List all saved checkpoints with their metadata
+        Returns:
+            - checkpoints: list of checkpoint information dictionaries
+        """
         return self.checkpoint_history.copy()
     
     def _cleanup_checkpoints(self):
-        """Remove old checkpoints if exceeding max limit"""
+        """
+        Remove old checkpoints if exceeding maximum limit
+        Keeps the most recent checkpoints and preserves best checkpoint
+        """
         if self.max_checkpoints <= 0:
             return
         
@@ -167,7 +208,11 @@ class CheckpointManager:
                 self.checkpoint_history.remove(checkpoint_info)
     
     def delete_checkpoint(self, checkpoint_path: str):
-        """Delete a specific checkpoint"""
+        """
+        Delete a specific checkpoint file and remove from history
+        Args:
+            - checkpoint_path: path to checkpoint file to delete
+        """
         checkpoint_path = Path(checkpoint_path)
         
         if checkpoint_path.exists():
@@ -181,7 +226,12 @@ class CheckpointManager:
         ]
     
     def export_checkpoint(self, checkpoint_path: str, export_path: str):
-        """Export checkpoint to a different location"""
+        """
+        Export checkpoint to a different location (copy)
+        Args:
+            - checkpoint_path: source checkpoint path
+            - export_path: destination path for exported checkpoint
+        """
         src_path = Path(checkpoint_path)
         dst_path = Path(export_path)
         
@@ -201,7 +251,17 @@ def create_checkpoint_from_trainer(
     include_optimizer: bool = True,
     include_scheduler: bool = True
 ) -> Dict[str, Any]:
-    """Create checkpoint dictionary from trainer"""
+    """
+    Create checkpoint dictionary from trainer object
+    Args:
+        - trainer: trainer object with model, optimizer, scheduler
+        - epoch: current training epoch
+        - metrics: optional metrics dictionary
+        - include_optimizer: whether to include optimizer state
+        - include_scheduler: whether to include scheduler state
+    Returns:
+        - checkpoint: complete checkpoint dictionary
+    """
     
     # Handle DataParallel/DDP models
     model_state = trainer.model.module.state_dict() if hasattr(trainer.model, 'module') else trainer.model.state_dict()
@@ -226,7 +286,15 @@ def create_checkpoint_from_trainer(
 
 
 def load_checkpoint_to_trainer(trainer, checkpoint: Dict[str, Any], load_optimizer: bool = True):
-    """Load checkpoint data to trainer"""
+    """
+    Load checkpoint data into trainer object
+    Args:
+        - trainer: trainer object to load checkpoint into
+        - checkpoint: checkpoint dictionary to load
+        - load_optimizer: whether to load optimizer state
+    Returns:
+        - tuple: (epoch, metrics) from loaded checkpoint
+    """
     
     # Load model state
     if hasattr(trainer.model, 'module'):

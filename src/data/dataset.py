@@ -18,6 +18,14 @@ class BaseDataset(Dataset):
         target_transform: Optional[Callable] = None,
         cache_images: bool = False
     ):
+        """
+        Initialize BaseDataset
+        Args:
+            - image_paths: list of tuples (image_path, label)
+            - transform: optional transform to apply to images
+            - target_transform: optional transform to apply to labels
+            - cache_images: whether to cache loaded images in memory
+        """
         self.image_paths = image_paths
         self.transform = transform
         self.target_transform = target_transform
@@ -28,7 +36,9 @@ class BaseDataset(Dataset):
         self._validate_paths()
     
     def _validate_paths(self):
-        """Validate that all image paths exist"""
+        """
+        Validate that all image paths exist and remove invalid ones
+        """
         invalid_paths = []
         for img_path, _ in self.image_paths:
             if not img_path.exists():
@@ -39,9 +49,21 @@ class BaseDataset(Dataset):
             self.image_paths = [(p, l) for p, l in self.image_paths if p.exists()]
 
     def __len__(self) -> int:
+        """
+        Get dataset length
+        Returns:
+            - length: number of samples in dataset
+        """
         return len(self.image_paths)
 
     def __getitem__(self, idx: int) -> Dict:
+        """
+        Get item at index
+        Args:
+            - idx: index of item to retrieve
+        Returns:
+            - sample: dictionary containing image, label, path, and original_image
+        """
         img_path, label = self.image_paths[idx]
         
         # Load from cache or file
@@ -73,26 +95,48 @@ class BaseDataset(Dataset):
         }
     
     def get_class_distribution(self) -> Dict[int, int]:
-        """Get distribution of classes in dataset"""
+        """
+        Get distribution of classes in dataset
+        Returns:
+            - distribution: dictionary mapping class indices to counts
+        """
         class_counts = {}
         for _, label in self.image_paths:
             class_counts[label] = class_counts.get(label, 0) + 1
         return class_counts
     
     def get_image_paths_by_class(self, class_idx: int) -> List[Path]:
-        """Get all image paths for a specific class"""
+        """
+        Get all image paths for a specific class
+        Args:
+            - class_idx: class index to filter by
+        Returns:
+            - paths: list of image paths belonging to the specified class
+        """
         return [path for path, label in self.image_paths if label == class_idx]
 
 
 class CustomDataset(BaseDataset):
-    """Custom dataset for image classification"""
+    """
+    Custom dataset for image classification
+    Inherits all functionality from BaseDataset
+    """
     pass
 
 
 class MemoryEfficientDataset(BaseDataset):
-    """Memory efficient dataset that loads images on-the-fly"""
+    """
+    Memory efficient dataset that loads images on-the-fly
+    Forces cache_images=False to minimize memory usage
+    """
     
     def __init__(self, *args, **kwargs):
+        """
+        Initialize MemoryEfficientDataset
+        Args:
+            - *args: arguments for BaseDataset
+            - **kwargs: keyword arguments for BaseDataset (cache_images forced to False)
+        """
         # Force cache_images to False for memory efficiency
         kwargs['cache_images'] = False
         super().__init__(*args, **kwargs)

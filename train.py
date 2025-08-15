@@ -5,6 +5,10 @@ from src.models.model import UNet
 from src.trainer.main_trainer import MainTrainer
 from src.data.loader import get_dataloader
 def main():
+    """
+    Main training function
+    Parses arguments, creates model and trainer, then starts training
+    """
     args = parse_arguments()
     print_args(args)
     

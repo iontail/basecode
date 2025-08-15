@@ -11,7 +11,14 @@ from .collate import collate_fn, mixup_collate_fn
 
 
 def get_transforms(args, is_train=True):
-    """Create transforms based on args configuration"""
+    """
+    Create data transforms based on args configuration
+    Args:
+        - args: configuration object with transform settings
+        - is_train: whether to apply training augmentations
+    Returns:
+        - transform: composed torchvision transforms
+    """
     transform_list = []
     
     # Resize
@@ -70,7 +77,14 @@ def get_transforms(args, is_train=True):
 
 
 def create_balanced_sampler(labels: list, num_samples: int = None):
-    """Create a balanced sampler for handling class imbalance"""
+    """
+    Create a balanced sampler for handling class imbalance
+    Args:
+        - labels: list of class labels
+        - num_samples: number of samples to draw (defaults to len(labels))
+    Returns:
+        - sampler: WeightedRandomSampler for balanced sampling
+    """
     class_counts = Counter(labels)
     class_weights = {cls: 1.0 / count for cls, count in class_counts.items()}
     weights = [class_weights[label] for label in labels]
@@ -90,6 +104,19 @@ def create_dataloader(
     return_class_mapping: bool = False,
     use_balanced_sampling: bool = False
     ) -> DataLoader:
+    """
+    Create a DataLoader for a given directory
+    Args:
+        - data_dir: path to data directory
+        - args: configuration object
+        - batch_size: batch size for data loader
+        - shuffle: whether to shuffle data
+        - is_train: whether this is training data (affects augmentations)
+        - return_class_mapping: whether to return class mapping
+        - use_balanced_sampling: whether to use balanced sampling
+    Returns:
+        - dataloader: PyTorch DataLoader (and optionally class_mapping)
+    """
     
     extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
     image_paths, class_mapping = collect_image_paths(data_dir, extensions=extensions)
@@ -142,7 +169,14 @@ def create_dataloader(
 
 
 def get_dataloader(args, return_class_mapping=False):
-    """Create train, validation, and test dataloaders"""
+    """
+    Create train, validation, and test dataloaders
+    Args:
+        - args: configuration object with data paths and settings
+        - return_class_mapping: whether to return class mapping
+    Returns:
+        - tuple: (train_loader, val_loader, test_loader[, class_mapping])
+    """
     data_path = Path(args.data_path)
     
     # Check if split directories exist, otherwise create split
@@ -209,7 +243,13 @@ def get_dataloader(args, return_class_mapping=False):
 
 
 def create_split_dataloaders(args):
-    """Create dataloaders with automatic train/val/test split"""
+    """
+    Create dataloaders with automatic train/val/test split
+    Args:
+        - args: configuration object with data paths and split settings
+    Returns:
+        - tuple: (train_loader, val_loader, test_loader, class_mapping)
+    """
     data_path = Path(args.data_path)
     extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
     image_paths, class_mapping = collect_image_paths(data_path, extensions=extensions)

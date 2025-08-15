@@ -3,12 +3,20 @@ import os
 from datetime import datetime
 
 def parse_arguments():
+    """
+    Parse command line arguments for training configuration
+    Returns:
+        - args: parsed arguments namespace with all training parameters
+    """
     parser = argparse.ArgumentParser(description='Image Classification Training Configuration')
 
+    # Reproducibility arguments
     parser.add_argument('--seed', type=int, default=42, 
                         help='Random seed for reproducibility')
     parser.add_argument('--deterministic', action='store_true', default=False,
                         help='Use deterministic algorithms for reproducibility')
+    
+    # Data arguments
     parser.add_argument('--data_path', type=str, default='./data/dataset',
                         help='Path to the dataset')
     parser.add_argument('--dataset', type=str, default='cifar10',
@@ -26,6 +34,7 @@ def parse_arguments():
     parser.add_argument('--pin_memory', action='store_true', default=True,
                         help='Use pinned memory for data loading')
     
+    # Data augmentation arguments
     parser.add_argument('--random_crop', action='store_true', default=True,
                         help='Apply random cropping to images')
     parser.add_argument('--random_flip', action='store_true', default=True,
@@ -58,6 +67,7 @@ def parse_arguments():
     parser.add_argument('--memory_efficient', action='store_true', default=False,
                         help='Use memory efficient dataset loading')
 
+    # Model architecture arguments
     parser.add_argument('--model', type=str, default='unet',
                         help='Model to use', choices=['unet', 'resnet18', 'resnet50', 'vit'])
     parser.add_argument('--num_classes', type=int, default=10,
@@ -77,6 +87,7 @@ def parse_arguments():
     parser.add_argument('--dropout', type=float, default=0.2,
                         help='Dropout rate')
 
+    # Training arguments
     parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs for training')
     parser.add_argument('--lr', type=float, default=1e-3,
@@ -103,12 +114,11 @@ def parse_arguments():
     parser.add_argument('--scheduler_factor', type=float, default=0.1,
                         help='Factor for ReduceLROnPlateau schedulerz')
     
-
-    parser.add_argument('--criterion', type=str, default='cross_entropy',
-                        help='Loss function to use')
+    # Loss function arguments
     parser.add_argument('--label_smoothing', type=float, default=0.0,
                         help='Label smoothing factor')
 
+    # Evaluation arguments
     parser.add_argument('--eval_freq', type=int, default=1,
                         help='Frequency of evaluation during training (in epochs)')
     parser.add_argument('--evaluate', action='store_true', default=False,
@@ -116,11 +126,13 @@ def parse_arguments():
     parser.add_argument('--test_only', action='store_true', default=False,
                         help='Only run test evaluation')
 
+    # Checkpoint arguments
     parser.add_argument('--resume', type=str, default='',
                         help='Path to checkpoint to resume training from')
     parser.add_argument('--load_best', action='store_true', default=False,
                         help='Load best model instead of latest when resuming')
 
+    # Logging arguments
     parser.add_argument('--log_dir', type=str, default='./logs',
                         help='Directory to save the training logs')
     parser.add_argument('--experiment_name', type=str, 
@@ -137,6 +149,7 @@ def parse_arguments():
     parser.add_argument('--print_freq', type=int, default=100,
                         help='Print frequency during training')
 
+    # Hardware arguments
     parser.add_argument('--device', type=str, default='auto',
                         choices=['auto', 'cpu', 'cuda', 'mps'],
                         help='Device to use for training')
@@ -151,6 +164,7 @@ def parse_arguments():
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch.compile for optimization (PyTorch 2.0+)')
     
+    # Model saving arguments
     parser.add_argument('--save_best', action='store_true', default=True,
                         help='Save the best model based on validation performance')
     parser.add_argument('--save_last', action='store_true', default=True,
@@ -162,6 +176,7 @@ def parse_arguments():
     parser.add_argument('--keep_checkpoint_max', type=int, default=5,
                         help='Maximum number of checkpoints to keep')
 
+    # Debug and testing arguments
     parser.add_argument('--debug', action='store_true', default=False,
                         help='Debug mode (use small subset of data)')
     parser.add_argument('--dry_run', action='store_true', default=False,
@@ -171,6 +186,7 @@ def parse_arguments():
     parser.add_argument('--fast_dev_run', action='store_true', default=False,
                         help='Run one batch for debugging')
 
+    # Early stopping arguments
     parser.add_argument('--early_stopping', action='store_true', default=False,
                         help='Use early stopping')
     parser.add_argument('--patience', type=int, default=10,
@@ -208,6 +224,11 @@ def parse_arguments():
     return args
 
 def print_args(args):
+    """
+    Print training configuration in organized categories
+    Args:
+        - args: parsed arguments namespace to display
+    """
     print("=" * 60)
     print("Training Configuration")
     print("=" * 60)

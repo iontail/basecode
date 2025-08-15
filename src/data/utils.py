@@ -6,7 +6,13 @@ import numpy as np
 
 
 def get_class_mapping(data_dir: Path) -> Dict[str, int]:
-    """Get mapping from class names to indices"""
+    """
+    Get mapping from class names to indices
+    Args:
+        - data_dir: path to data directory with class subdirectories
+    Returns:
+        - mapping: dictionary mapping class names to integer indices
+    """
     class_dirs = sorted([d.name for d in data_dir.iterdir() if d.is_dir()])
     return {class_name: idx for idx, class_name in enumerate(class_dirs)}
 
@@ -16,7 +22,15 @@ def collect_image_paths(
     extensions: List[str] = None,
     recursive: bool = True
 ) -> Tuple[List[Tuple[Path, int]], Dict[str, int]]:
-    """Collect all image paths with their labels"""
+    """
+    Collect all image paths with their labels
+    Args:
+        - data_dir: path to data directory
+        - extensions: list of image file extensions to include
+        - recursive: whether to search recursively in subdirectories
+    Returns:
+        - tuple: (list of (image_path, label) tuples, class_mapping dictionary)
+    """
     data_dir = Path(data_dir)
     
     if extensions is None:
@@ -56,7 +70,15 @@ def create_balanced_split(
     split_ratios: List[float],
     seed: int = 42
 ) -> Tuple[List[Tuple[Path, int]], List[Tuple[Path, int]], List[Tuple[Path, int]]]:
-    """Create balanced train/val/test split"""
+    """
+    Create balanced train/val/test split maintaining class proportions
+    Args:
+        - image_paths: list of (image_path, label) tuples
+        - split_ratios: list of three floats [train_ratio, val_ratio, test_ratio]
+        - seed: random seed for reproducibility
+    Returns:
+        - tuple: (train_paths, val_paths, test_paths)
+    """
     if len(split_ratios) != 3:
         raise ValueError("split_ratios must have exactly 3 values [train, val, test]")
     
@@ -93,7 +115,13 @@ def create_balanced_split(
 
 
 def analyze_dataset_balance(image_paths: List[Tuple[Path, int]]) -> Dict[str, Union[int, float]]:
-    """Analyze class distribution in dataset"""
+    """
+    Analyze class distribution and balance in dataset
+    Args:
+        - image_paths: list of (image_path, label) tuples
+    Returns:
+        - stats: dictionary with dataset balance statistics
+    """
     labels = [label for _, label in image_paths]
     class_counts = Counter(labels)
     
@@ -123,7 +151,14 @@ def analyze_dataset_balance(image_paths: List[Tuple[Path, int]]) -> Dict[str, Un
 
 
 def create_class_weights(image_paths: List[Tuple[Path, int]], method: str = 'inverse') -> Dict[int, float]:
-    """Create class weights for handling imbalanced datasets"""
+    """
+    Create class weights for handling imbalanced datasets
+    Args:
+        - image_paths: list of (image_path, label) tuples
+        - method: weighting method ('inverse' or 'sqrt_inverse')
+    Returns:
+        - weights: dictionary mapping class indices to weights
+    """
     labels = [label for _, label in image_paths]
     class_counts = Counter(labels)
     
@@ -146,7 +181,15 @@ def filter_by_class_size(
     min_samples: int = 10,
     max_samples: int = None
 ) -> List[Tuple[Path, int]]:
-    """Filter classes by minimum and maximum sample count"""
+    """
+    Filter classes by minimum and maximum sample count
+    Args:
+        - image_paths: list of (image_path, label) tuples
+        - min_samples: minimum number of samples required per class
+        - max_samples: maximum number of samples allowed per class (optional)
+    Returns:
+        - filtered_paths: list of (image_path, label) tuples for valid classes
+    """
     class_counts = Counter(label for _, label in image_paths)
     
     valid_classes = set()
