@@ -125,8 +125,8 @@ python train.py --mixed_precision --use_wandb --save_best \
 python train.py --resume ./checkpoints/best_model.pt
 ```
 
-## 📞 Contact
+🐛 **Bug Reports & Issues**
+Found a bug or have questions? Please email leechanhye@g.skku.edu
 
-**Issues**: leechanhye@g.skku.edu
-
-**License**: Open for research use
+📄 **License**
+This project is freely available for all research purposes
