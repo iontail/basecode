@@ -30,11 +30,13 @@ class WarmupScheduler:
         self.warmup_start_lr = warmup_start_lr
         self.base_lr = optimizer.param_groups[0]['lr']
         self.current_epoch = 0
+        self.trainer_epoch_offset = 0
         
     def step(self, metrics=None):
-        if self.current_epoch < self.warmup_epochs:
+        effective_epoch = self.current_epoch + self.trainer_epoch_offset
+        if effective_epoch < self.warmup_epochs:
             # Linear warmup
-            lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * (self.current_epoch / self.warmup_epochs)
+            lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * (effective_epoch / self.warmup_epochs)
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr
         else:
@@ -51,13 +53,19 @@ class WarmupScheduler:
     def state_dict(self):
         return {
             'current_epoch': self.current_epoch,
+            'trainer_epoch_offset': self.trainer_epoch_offset,
             'base_scheduler_state': self.base_scheduler.state_dict() if hasattr(self.base_scheduler, 'state_dict') else None
         }
     
     def load_state_dict(self, state_dict):
         self.current_epoch = state_dict['current_epoch']
+        self.trainer_epoch_offset = state_dict.get('trainer_epoch_offset', 0)
         if state_dict['base_scheduler_state'] and hasattr(self.base_scheduler, 'load_state_dict'):
             self.base_scheduler.load_state_dict(state_dict['base_scheduler_state'])
+    
+    def sync_with_trainer_epoch(self, trainer_epoch):
+        """Synchronize scheduler epoch with trainer epoch"""
+        self.trainer_epoch_offset = trainer_epoch - self.current_epoch
 
 
 class BaseTrainer(ABC):
@@ -194,12 +202,14 @@ class BaseTrainer(ABC):
                 lr=self.args.lr,
                 weight_decay=self.args.weight_decay
             )
+
         elif self.args.optimizer == 'AdamW':
             optimizer = AdamW(
                 params,
                 lr=self.args.lr,
                 weight_decay=self.args.weight_decay
             )
+
         elif self.args.optimizer == 'SGD':
             momentum = getattr(self.args, 'momentum', 0.9)
             optimizer = SGD(
@@ -208,6 +218,7 @@ class BaseTrainer(ABC):
                 momentum=momentum,
                 weight_decay=self.args.weight_decay
             )
+
         elif self.args.optimizer == 'RMSprop':
             momentum = getattr(self.args, 'momentum', 0.0)
             optimizer = RMSprop(
@@ -239,17 +250,21 @@ class BaseTrainer(ABC):
         if self.args.scheduler == 'cosine':
             eta_min = getattr(self.args, 'min_lr', 0)
             base_scheduler = CosineAnnealingLR(optimizer, T_max=self.args.epochs - warmup_epochs, eta_min=eta_min)
+
         elif self.args.scheduler == 'step':
             step_size = getattr(self.args, 'step_size', self.args.epochs // 3)
             gamma = getattr(self.args, 'gamma', 0.1)
             base_scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+
         elif self.args.scheduler == 'plateau':
             patience = getattr(self.args, 'scheduler_patience', 10)
             factor = getattr(self.args, 'scheduler_factor', 0.1)
             base_scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=patience, factor=factor)
+
         elif self.args.scheduler == 'exponential':
             gamma = getattr(self.args, 'gamma', 0.95)
             base_scheduler = ExponentialLR(optimizer, gamma=gamma)
+
         else:
             raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
         
@@ -281,6 +296,7 @@ class BaseTrainer(ABC):
             - additional_info: additional information to save in checkpoint
         """
         # Handle DataParallel models
+        # If DataParallel, use module attribute to access model
         model_state = self.model.module.state_dict() if hasattr(self.model, 'module') else self.model.state_dict()
         
         checkpoint = {
@@ -300,7 +316,7 @@ class BaseTrainer(ABC):
         torch.save(checkpoint, filepath)
         
         if is_best:
-            best_path = os.path.join(self.args.save_dir, 'best_model.pt')
+            best_path = os.path.join(self.args.save_dir, f'{self.args.experiment_name}_best_model.pt')
             torch.save(checkpoint, best_path)
             self.best_model_path = best_path
         
@@ -329,6 +345,9 @@ class BaseTrainer(ABC):
 
         if self.scheduler and checkpoint.get('scheduler_state_dict'):
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            # Sync WarmupScheduler with trainer epoch if resuming
+            if isinstance(self.scheduler, WarmupScheduler):
+                self.scheduler.sync_with_trainer_epoch(self.current_epoch)
         
         if self.scaler and checkpoint.get('scaler_state_dict'):
             self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
@@ -351,9 +370,10 @@ class BaseTrainer(ABC):
             epoch = self.current_epoch
 
         phase_parts = []
-        for phase, phase_metrics in metrics.items():
-            if not phase_metrics:
+        for phase, phase_metrics in metrics.items():  # train or evaluation
+            if not phase_metrics: # if evaluation metrics are empty (because of evaluation log frequency)
                 continue
+
             metric_items = [f"{k}: {v:.4f}" for k, v in phase_metrics.items()]
             phase_parts.append(f"{phase.upper()}: {' | '.join(metric_items)}")
             
@@ -396,7 +416,7 @@ class BaseTrainer(ABC):
     
     def model_size_b(self, model: nn.Module) -> int:
         """
-        Calculate model size in bytes including parameters and buffers
+        Returns model size in bytes. Based on https://discuss.pytorch.org/t/finding-model-size/130275/2
         Args:
             - model: PyTorch model
         Returns:
@@ -424,8 +444,8 @@ class BaseTrainer(ABC):
         Clip gradients if grad_clip is specified in args
         """
         if hasattr(self.args, 'grad_clip') and self.args.grad_clip > 0:
-            if self.scaler:
-                self.scaler.unscale_(self.optimizer)
+            if self.scaler: # Clipping on unscaled gradients of Mixed Precision(AMP)
+                self.scaler.unscale_(self.optimizer) 
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
     
     def mixed_precision_step(self, loss: torch.Tensor):
@@ -435,6 +455,9 @@ class BaseTrainer(ABC):
             - loss: computed loss tensor
         """
         if self.scaler:
+            # In Mixed Precision (AMP), GradScaler scales the loss to prevent gradient underflow
+            # During scaler.step(optimizer), gradients are automatically unscaled 
+            # before performing the weight update
             self.scaler.scale(loss).backward()
             self.clip_gradients()
             self.scaler.step(self.optimizer)
@@ -463,10 +486,19 @@ class BaseTrainer(ABC):
         
         print(f"Starting training for {self.args.epochs} epochs...")
 
+        if self.scheduler:
+                # For schedulers that need validation metrics (ReduceLROnPlateau or WarmupScheduler with ReduceLROnPlateau base)
+                self.needs_validation_metric = (
+                    isinstance(self.scheduler, ReduceLROnPlateau) or
+                    (isinstance(self.scheduler, WarmupScheduler) and 
+                     isinstance(self.scheduler.base_scheduler, ReduceLROnPlateau))
+                )
+
         eval_freq = getattr(self.args, 'eval_freq', 1)
 
         epoch_range = range(self.current_epoch, self.args.epochs)
-        for epoch in tqdm(epoch_range, desc="Training Progress", unit="epoch", initial=self.current_epoch, total=self.args.epochs):
+        epoch_bar =  tqdm(epoch_range, desc="Training Progress", unit="epoch", initial=self.current_epoch, total=self.args.epochs)
+        for epoch in epoch_bar:
             self.current_epoch = epoch + 1
             
             # Training phase
@@ -486,16 +518,11 @@ class BaseTrainer(ABC):
             
             # Update scheduler
             if self.scheduler:
-                if isinstance(self.scheduler, WarmupScheduler):
-                    if 'val_loss' in val_metrics:
-                        self.scheduler.step(val_metrics['val_loss'])
-                    else:
-                        self.scheduler.step()
-                elif isinstance(self.scheduler, ReduceLROnPlateau):
-                    if 'val_loss' in val_metrics:
-                        self.scheduler.step(val_metrics['val_loss'])
-                else:
+                if self.needs_validation_metric and 'val_loss' in val_metrics:
+                    self.scheduler.step(val_metrics['val_loss'])
+                elif not self.needs_validation_metric:
                     self.scheduler.step()
+                # If validation metric is needed but not available, skip scheduler step
             
             # Save checkpoints
             if hasattr(self.args, 'save_best') and self.args.save_best and 'val_loss' in val_metrics:
@@ -504,7 +531,7 @@ class BaseTrainer(ABC):
                     self.best_metric = val_metrics['val_loss']
                     self.early_stopping_counter = 0
                     self.save_checkpoint(
-                        os.path.join(self.args.save_dir, f'best_epoch_{epoch}.pt'), 
+                        os.path.join(self.args.save_dir, f'{self.args.experiment_name}_best_epoch_{epoch}.pt'), 
                         is_best=True
                     )
                 elif self.args.early_stopping:
@@ -515,7 +542,7 @@ class BaseTrainer(ABC):
             
             # Save regular checkpoint
             if hasattr(self.args, 'save_freq') and (epoch + 1) % self.args.save_freq == 0:
-                checkpoint_path = os.path.join(self.args.save_dir, f'checkpoint_epoch_{epoch}.pt')
+                checkpoint_path = os.path.join(self.args.save_dir, f'{self.args.experiment_name}_checkpoint_epoch_{epoch}.pt')
                 self.save_checkpoint(checkpoint_path)
         
         if self.writer:
@@ -584,20 +611,23 @@ class BaseTrainer(ABC):
     
     def _cleanup_checkpoints(self):
         """
-        Remove old checkpoints if exceeding keep_checkpoint_max limit
+        Remove old checkpoints keeping only the most recent 2 regular checkpoints per experiment
+        Best model checkpoints are preserved separately
         """
-        if not hasattr(self.args, 'keep_checkpoint_max') or self.args.keep_checkpoint_max <= 0:
-            return
-        
+        # Get all regular checkpoint files for this specific experiment
         checkpoint_files = []
+        checkpoint_prefix = f'{self.args.experiment_name}_epoch_'
+        
         for file in os.listdir(self.args.save_dir):
-            if file.startswith('checkpoint_epoch_') and file.endswith('.pt'):
+            if file.startswith(checkpoint_prefix) and file.endswith('.pt'):
                 filepath = os.path.join(self.args.save_dir, file)
                 checkpoint_files.append((filepath, os.path.getmtime(filepath)))
         
-        if len(checkpoint_files) > self.args.keep_checkpoint_max:
-            checkpoint_files.sort(key=lambda x: x[1])
-            for filepath, _ in checkpoint_files[:-self.args.keep_checkpoint_max]:
+        # Keep only the most recent 2 regular checkpoints for this experiment
+        max_regular_checkpoints = 2
+        if len(checkpoint_files) > max_regular_checkpoints:
+            checkpoint_files.sort(key=lambda x: x[1])  # Sort by modification time
+            for filepath, _ in checkpoint_files[:-max_regular_checkpoints]:
                 os.remove(filepath)
                 print(f"Removed old checkpoint: {os.path.basename(filepath)}")
     

@@ -56,18 +56,10 @@ class MainTrainer(BaseTrainer):
         
         """
         Example implementation:
-        self.model.train()
-        total_loss = 0.0
-        num_batches = 0
 
         for batch in train_loader:
             loss, predictions = self.forward_pass(batch)
-            self.mixed_precision_step(loss)
-            total_loss += loss.item()
-            num_batches += 1
-
-        avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
-        return {'loss': avg_loss}
+            ...
         """
         pass
     
