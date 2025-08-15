@@ -107,6 +107,8 @@ def parse_arguments():
                         choices=['step', 'cosine', 'plateau', 'exponential', 'none'])
     parser.add_argument('--warmup_epochs', type=int, default=5,
                         help='Number of warmup epochs for the learning rate scheduler')
+    parser.add_argument('--warmup_start_lr', type=float, default=1e-6,
+                        help='Starting learning rate for warmup phase')
     parser.add_argument('--gamma', type=float, default=0.1,
                         help='Gamma value for step scheduler')
     parser.add_argument('--scheduler_patience', type=int, default=10,

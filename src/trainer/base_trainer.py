@@ -4,7 +4,7 @@ import os
 import torch
 import torch.nn as nn
 from torch.optim import Adam, AdamW, SGD, RMSprop
-from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, ReduceLROnPlateau, ExponentialLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, ReduceLROnPlateau, ExponentialLR, LambdaLR
 from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -17,6 +17,47 @@ try:
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
+
+
+class WarmupScheduler:
+    """
+    Wrapper for learning rate schedulers to add warmup functionality
+    """
+    def __init__(self, optimizer, base_scheduler, warmup_epochs, warmup_start_lr=1e-6):
+        self.optimizer = optimizer
+        self.base_scheduler = base_scheduler
+        self.warmup_epochs = warmup_epochs
+        self.warmup_start_lr = warmup_start_lr
+        self.base_lr = optimizer.param_groups[0]['lr']
+        self.current_epoch = 0
+        
+    def step(self, metrics=None):
+        if self.current_epoch < self.warmup_epochs:
+            # Linear warmup
+            lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * (self.current_epoch / self.warmup_epochs)
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
+        else:
+            # Use base scheduler after warmup
+            if hasattr(self.base_scheduler, 'step'):
+                if isinstance(self.base_scheduler, ReduceLROnPlateau):
+                    if metrics is not None:
+                        self.base_scheduler.step(metrics)
+                else:
+                    self.base_scheduler.step()
+        
+        self.current_epoch += 1
+    
+    def state_dict(self):
+        return {
+            'current_epoch': self.current_epoch,
+            'base_scheduler_state': self.base_scheduler.state_dict() if hasattr(self.base_scheduler, 'state_dict') else None
+        }
+    
+    def load_state_dict(self, state_dict):
+        self.current_epoch = state_dict['current_epoch']
+        if state_dict['base_scheduler_state'] and hasattr(self.base_scheduler, 'load_state_dict'):
+            self.base_scheduler.load_state_dict(state_dict['base_scheduler_state'])
 
 
 class BaseTrainer(ABC):
@@ -188,22 +229,46 @@ class BaseTrainer(ABC):
         """
         if not hasattr(self.args, 'scheduler') or self.args.scheduler == 'none':
             return None
-        elif self.args.scheduler == 'cosine':
+        
+        # Get warmup parameters
+        warmup_epochs = getattr(self.args, 'warmup_epochs', 0)
+        
+        # Create base scheduler
+        if self.args.scheduler == 'cosine':
             eta_min = getattr(self.args, 'min_lr', 0)
-            return CosineAnnealingLR(optimizer, T_max=self.args.epochs, eta_min=eta_min)
+            base_scheduler = CosineAnnealingLR(optimizer, T_max=self.args.epochs - warmup_epochs, eta_min=eta_min)
         elif self.args.scheduler == 'step':
             step_size = getattr(self.args, 'step_size', self.args.epochs // 3)
             gamma = getattr(self.args, 'gamma', 0.1)
-            return StepLR(optimizer, step_size=step_size, gamma=gamma)
+            base_scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
         elif self.args.scheduler == 'plateau':
             patience = getattr(self.args, 'scheduler_patience', 10)
             factor = getattr(self.args, 'scheduler_factor', 0.1)
-            return ReduceLROnPlateau(optimizer, mode='min', patience=patience, factor=factor)
+            base_scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=patience, factor=factor)
         elif self.args.scheduler == 'exponential':
             gamma = getattr(self.args, 'gamma', 0.95)
-            return ExponentialLR(optimizer, gamma=gamma)
+            base_scheduler = ExponentialLR(optimizer, gamma=gamma)
         else:
             raise ValueError(f"Unsupported scheduler: {self.args.scheduler}")
+        
+        # Wrap with warmup if specified
+        if warmup_epochs > 0:
+            return self._create_warmup_scheduler(optimizer, base_scheduler, warmup_epochs)
+        else:
+            return base_scheduler
+    
+    def _create_warmup_scheduler(self, optimizer, base_scheduler, warmup_epochs):
+        """
+        Create warmup scheduler wrapper
+        Args:
+            - optimizer: PyTorch optimizer
+            - base_scheduler: base learning rate scheduler
+            - warmup_epochs: number of warmup epochs
+        Returns:
+            - warmup_scheduler: WarmupScheduler instance
+        """
+        warmup_start_lr = getattr(self.args, 'warmup_start_lr', 1e-6)
+        return WarmupScheduler(optimizer, base_scheduler, warmup_epochs, warmup_start_lr)
     
     def save_checkpoint(self, filepath: str, is_best: bool = False, additional_info: Dict[str, Any] = None):
         """
@@ -382,7 +447,12 @@ class BaseTrainer(ABC):
             
             # Update scheduler
             if self.scheduler:
-                if isinstance(self.scheduler, ReduceLROnPlateau):
+                if isinstance(self.scheduler, WarmupScheduler):
+                    if 'val_loss' in val_metrics:
+                        self.scheduler.step(val_metrics['val_loss'])
+                    else:
+                        self.scheduler.step()
+                elif isinstance(self.scheduler, ReduceLROnPlateau):
                     if 'val_loss' in val_metrics:
                         self.scheduler.step(val_metrics['val_loss'])
                 else:
