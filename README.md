@@ -101,9 +101,10 @@ class MainTrainer(BaseTrainer):
 ## 📋 Requirements
 
 **Models** must inherit from `BaseModel` and implement:
-- `init_weights()`: Weight initialization
+
 - `dim` property: Output dimension
 - `forward()`: Forward pass
+- `init_weights()`: Weight initialization, if need specific initialization
 
 **Trainers** must inherit from `BaseTrainer` and implement:
 - `get_criterion()`: Loss function(s)
