@@ -84,6 +84,8 @@ class BaseTrainer(ABC):
         self.val_loader = val_loader
         self.test_loader = test_loader
         
+        self.params = self.model.parameters()
+        
         self.optimizer = None
         self.scheduler = None
         self.criterion = None
@@ -184,7 +186,7 @@ class BaseTrainer(ABC):
         Returns:
             - optimizer: configured PyTorch optimizer
         """
-        params = self.model.parameters()
+        params = self.params
         
         if self.args.optimizer == 'Adam':
             optimizer = Adam(
@@ -407,6 +409,43 @@ class BaseTrainer(ABC):
             size += buf.nelement() * buf.element_size()
         return size
     
+    def get_lr(self) -> float:
+        """
+        Get current learning rate from optimizer
+        Returns:
+            - lr: current learning rate
+        """
+        if self.optimizer:
+            return self.optimizer.param_groups[0]['lr']
+        return 0.0
+    
+    def clip_gradients(self):
+        """
+        Clip gradients if grad_clip is specified in args
+        """
+        if hasattr(self.args, 'grad_clip') and self.args.grad_clip > 0:
+            if self.scaler:
+                self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
+    
+    def mixed_precision_step(self, loss: torch.Tensor):
+        """
+        Perform optimization step with mixed precision support
+        Args:
+            - loss: computed loss tensor
+        """
+        if self.scaler:
+            self.scaler.scale(loss).backward()
+            self.clip_gradients()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            loss.backward()
+            self.clip_gradients()
+            self.optimizer.step()
+        
+        self.optimizer.zero_grad()
+    
     def train(self):
         """
         Main training loop with validation, checkpointing, and early stopping
@@ -562,39 +601,3 @@ class BaseTrainer(ABC):
                 os.remove(filepath)
                 print(f"Removed old checkpoint: {os.path.basename(filepath)}")
     
-    def get_lr(self) -> float:
-        """
-        Get current learning rate from optimizer
-        Returns:
-            - lr: current learning rate
-        """
-        if self.optimizer:
-            return self.optimizer.param_groups[0]['lr']
-        return 0.0
-    
-    def clip_gradients(self):
-        """
-        Clip gradients if grad_clip is specified in args
-        """
-        if hasattr(self.args, 'grad_clip') and self.args.grad_clip > 0:
-            if self.scaler:
-                self.scaler.unscale_(self.optimizer)
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
-    
-    def mixed_precision_step(self, loss: torch.Tensor):
-        """
-        Perform optimization step with mixed precision support
-        Args:
-            - loss: computed loss tensor
-        """
-        if self.scaler:
-            self.scaler.scale(loss).backward()
-            self.clip_gradients()
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-        else:
-            loss.backward()
-            self.clip_gradients()
-            self.optimizer.step()
-        
-        self.optimizer.zero_grad()
