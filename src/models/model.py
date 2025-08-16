@@ -229,6 +229,10 @@ class UNet(BaseModel):
 
         return self.final_conv(x)
     
+    @torch.no_grad()
+    def inference(self, x: torch.Tensor) -> torch.Tensor:
+        return self.forward(x)
+    
     
     @property
     def dim(self) -> int:
