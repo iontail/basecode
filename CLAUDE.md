@@ -196,3 +196,33 @@ python train.py \
 - **Loss Functions**: Support single/multiple/named patterns for multi-task learning
 - **Weight Initialization**: Called automatically during trainer setup
 - **Checkpointing**: Includes complete training state for seamless resuming
+
+## 🚨 Critical Restrictions (MUST FOLLOW)
+
+### 🔴 Database Commands - ABSOLUTELY FORBIDDEN
+```bash
+# Database destructive commands - NEVER use without explicit user permission
+reset commands...
+
+# SQL destructive commands - ABSOLUTELY FORBIDDEN
+DROP, TRUNCATE, DELETE, ALTER
+```
+
+### 🛡️ Database Operation Rules
+1. **ALWAYS request explicit user permission before data deletion/reset**
+2. **NEVER delete data without backup**
+3. **Additional rules to be added**
+
+### 🔴 Git Dangerous Commands - ABSOLUTELY FORBIDDEN
+```bash
+git push --force
+git reset --hard
+git commit --no-verify
+```
+
+### 🔴 NPM Dangerous Commands
+```bash
+npm audit fix --force
+```
+
+### Library Version Lock (DO NOT CHANGE)
