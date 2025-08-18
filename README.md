@@ -55,6 +55,7 @@ arguments.py       # CLI arguments
 ## 🛠️ Implementation
 
 ### Model
+Implement the required methods as needed
 ```python
 from .base_models import BaseModel
 
@@ -82,42 +83,47 @@ class MainTrainer(BaseTrainer):
     
     def train_epoch(self, train_loader):
         # Training loop
-        return {'loss': avg_loss}
+        return {'loss': total_loss,
+                'loss1': loss1,
+                'loss2': loss2}
     
     def validate_epoch(self, val_loader):
         # Validation loop
-        return {'val_loss': avg_val_loss}
+        return {'val_loss': total_avg_loss,
+                'loss1': loss1,
+                'loss2': loss2}
 ```
 
 ## ✨ Features
 
-- **Training**: Mixed precision, multi-GPU, gradient clipping
-- **Scheduling**: Cosine annealing, step, plateau with warmup  
-- **Logging**: WandB, TensorBoard integration
-- **Data**: Advanced augmentations, balanced sampling
-- **Checkpointing**: Best model tracking, resume training
-- **Architecture**: Abstract base classes, modular design
+- **Training**: Mixed precision, multi-GPU support, gradient clipping, early stopping
+- **Scheduling**: Cosine annealing, step, plateau schedulers with warmup support
+- **Logging**: WandB and TensorBoard integration with automatic metrics tracking
+- **Data Pipeline**: Advanced augmentations, balanced sampling, memory-efficient loading
+- **Checkpointing**: Best model tracking, automatic cleanup, resume capability
+- **Architecture**: Abstract base classes with modular, extensible design
 
 ## 📋 Requirements
 
 **Models** must inherit from `BaseModel` and implement:
 
-- `dim` property: Output dimension
-- `forward()`: Forward pass
-- `init_weights()`: Weight initialization, if need specific initialization
+- `dim` property: Output dimension - **REQUIRED**
+- `forward()`: Forward pass - **REQUIRED**  
+- `init_weights()`: Weight initialization - **REQUIRED** (if specific initialization is needed)
 
 **Trainers** must inherit from `BaseTrainer` and implement:
-- `get_criterion()`: Loss function(s)
-- `train_epoch()`: Training loop
-- `validate_epoch()`: Validation loop
+- `get_criterion()`: Loss function(s) - **REQUIRED**
+- `train_epoch()`: Training loop - **REQUIRED**
+- `validate_epoch()`: Validation loop - **REQUIRED**
+- `forward_pass()`: Forward pass with loss computation - **REQUIRED**
 
-## 🔧 Examples
+## 🔧 Usage Examples
 
 ```bash
 # Basic training
 python train.py --data_path ./dataset --epochs 100
 
-# Advanced training
+# Advanced training with features
 python train.py --mixed_precision --use_wandb --save_best \
     --experiment_name "my_exp" --lr 1e-3 --batch_size 64
 
