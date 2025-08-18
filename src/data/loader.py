@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List, Tuple, Optional, Callable
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import transforms
 import torch
@@ -10,7 +11,7 @@ from .utils import collect_image_paths, create_balanced_split
 from .collate import collate_fn, mixup_collate_fn
 
 
-def get_transforms(args, is_train=True):
+def get_transforms(args, is_train: bool = True):
     """
     Create data transforms based on args configuration
     Args:
@@ -100,7 +101,8 @@ def create_dataloader(
     args,
     batch_size: int,
     shuffle: bool,
-    is_train: bool = False,
+    is_train: bool,
+    extensions: List[str],
     return_class_mapping: bool = False,
     use_balanced_sampling: bool = False
     ) -> DataLoader:
@@ -112,13 +114,16 @@ def create_dataloader(
         - batch_size: batch size for data loader
         - shuffle: whether to shuffle data
         - is_train: whether this is training data (affects augmentations)
+        - extensions: list of valid image file extensions
         - return_class_mapping: whether to return class mapping
         - use_balanced_sampling: whether to use balanced sampling
     Returns:
         - dataloader: PyTorch DataLoader (and optionally class_mapping)
     """
-    
-    extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']
+
+    if not extensions in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp']:
+        raise ValueError(f"Unsupported image extension. Supported extensions are: {extensions}")
+
     image_paths, class_mapping = collect_image_paths(data_dir, extensions=extensions)
     
     if not image_paths:
@@ -172,11 +177,12 @@ def create_dataloader(
     return dataloader
 
 
-def get_dataloader(args, return_class_mapping=False):
+def get_dataloader(args, extensions: List[str], return_class_mapping: bool = False):
     """
     Create train, validation, and test dataloaders
     Args:
         - args: configuration object with data paths and settings
+        - extensions: list of valid image file extensions
         - return_class_mapping: whether to return class mapping
     Returns:
         - tuple: (train_loader, val_loader, test_loader[, class_mapping])
@@ -199,6 +205,7 @@ def get_dataloader(args, return_class_mapping=False):
             args.batch_size,
             shuffle=True,
             is_train=True,
+            extensions=extensions,
             return_class_mapping=True,
             use_balanced_sampling=getattr(args, 'balanced_sampling', False)
         )
@@ -211,7 +218,8 @@ def get_dataloader(args, return_class_mapping=False):
             args, 
             getattr(args, 'val_batch_size', args.batch_size),
             shuffle=False,
-            is_train=False
+            is_train=False,
+            extensions=extensions
         )
         loaders['val'] = val_loader
     
@@ -222,7 +230,8 @@ def get_dataloader(args, return_class_mapping=False):
             args,
             getattr(args, 'test_batch_size', args.batch_size), 
             shuffle=False,
-            is_train=False
+            is_train=False,
+            extensions=extensions
         )
         loaders['test'] = test_loader
     

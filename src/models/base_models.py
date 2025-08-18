@@ -40,6 +40,10 @@ class BaseModel(nn.Module, ABC):
             - output: model output tensor
         """
         pass
+
+    @torch.no_grad()
+    def inference(self, x: torch.Tensor) -> torch.Tensor:
+        return self.forward(x)
     
     
 

@@ -33,7 +33,9 @@ def parse_arguments():
                         help='Ratio for train, validation, and test split')
     parser.add_argument('--pin_memory', action='store_true', default=True,
                         help='Use pinned memory for data loading')
-    
+    parser.add_argument('--extensions', type=list, default=['.jpg'],
+                        help='List of valid image file extensions')
+
     # Data augmentation arguments
     parser.add_argument('--random_crop', action='store_true', default=True,
                         help='Apply random cropping to images')

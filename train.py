@@ -21,7 +21,7 @@ def main():
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     
-    train_loader, val_loader, test_loader = get_dataloader(args)
+    train_loader, val_loader, test_loader = get_dataloader(args, extensions=args.extensions)
     trainer = MainTrainer(model, args, train_loader, val_loader, test_loader)
     trainer.train()
 
