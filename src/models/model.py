@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 from typing import List
-from base_models import BaseModel
+from src.models.base_models import BaseModel
 
 
 class ResidualLayer(BaseModel):

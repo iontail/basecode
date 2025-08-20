@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from base_trainer import BaseTrainer
+from src.trainer.base_trainer import BaseTrainer
 from typing import Any, Dict, Optional, Tuple, Union
 
 

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .base_models import BaseModel
+from src.models.base_models import BaseModel
 
 class conv1dBLC(BaseModel, nn.Conv1d):
     """
