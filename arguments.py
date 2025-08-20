@@ -123,6 +123,34 @@ def parse_arguments():
     # Loss function arguments
     parser.add_argument('--label_smoothing', type=float, default=0.0,
                         help='Label smoothing factor')
+    
+    # Loss weight arguments for combined/multi-task losses
+    parser.add_argument('--focal_alpha', type=float, default=1.0,
+                        help='Alpha parameter for Focal Loss')
+    parser.add_argument('--focal_gamma', type=float, default=2.0,
+                        help='Gamma parameter for Focal Loss')
+    parser.add_argument('--dice_smooth', type=float, default=1e-6,
+                        help='Smoothing factor for Dice Loss')
+    
+    # Loss weights for combined losses
+    parser.add_argument('--ce_weight', type=float, default=1.0,
+                        help='Weight for CrossEntropy loss in combined loss')
+    parser.add_argument('--focal_weight', type=float, default=1.0,
+                        help='Weight for Focal loss in combined loss')
+    parser.add_argument('--dice_weight', type=float, default=1.0,
+                        help='Weight for Dice loss in combined loss')
+    parser.add_argument('--mse_weight', type=float, default=1.0,
+                        help='Weight for MSE loss in combined loss')
+    parser.add_argument('--mae_weight', type=float, default=1.0,
+                        help='Weight for MAE loss in combined loss')
+    
+    # Multi-task loss weights
+    parser.add_argument('--classification_weight', type=float, default=1.0,
+                        help='Weight for classification task in multi-task learning')
+    parser.add_argument('--regression_weight', type=float, default=1.0,
+                        help='Weight for regression task in multi-task learning')
+    parser.add_argument('--segmentation_weight', type=float, default=1.0,
+                        help='Weight for segmentation task in multi-task learning')
 
     # Evaluation arguments
     parser.add_argument('--eval_freq', type=int, default=1,

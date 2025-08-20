@@ -40,6 +40,14 @@ class BaseModel(nn.Module, ABC):
             - output: model output tensor
         """
         pass
+    
+    @abstractmethod
+    def init_weights(self) -> None:
+        """
+        Initialize model weights
+        This method should be implemented by all subclasses
+        """
+        pass
 
     @torch.no_grad()
     def inference(self, x: torch.Tensor) -> torch.Tensor:

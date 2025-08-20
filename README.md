@@ -34,6 +34,9 @@ pip install -r requirements.txt
 # Training
 python train.py --data_path ./dataset --epochs 100 --batch_size 32
 
+# Training with loss weights
+python train.py --ce_weight 0.7 --focal_weight 0.3 --focal_alpha 1.0
+
 # Testing
 python test.py --weights ./checkpoints/best_model.pth
 ```
@@ -45,12 +48,140 @@ src/
 ├── data/           # Dataset, loading, preprocessing
 ├── models/         # Model architectures
 ├── trainer/        # Training infrastructure  
-└── utils/          # Utilities, metrics
+└── utils/          # Utilities, metrics, loss functions
 
 train.py           # Training entry
 test.py            # Evaluation entry
 arguments.py       # CLI arguments
 ```
+
+## 🔬 Research Workflow
+
+### Step-by-Step Guide for Starting Your Research
+
+#### 1. Define Your Loss Function (`src/utils/loss.py`)
+**MODIFY FIRST** - This determines your training objective
+```python
+def get_loss_function(args):
+    # For classification
+    return nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    
+    # For regression
+    return nn.MSELoss()
+    
+    # For custom loss with parameters from args
+    return FocalLoss(alpha=args.focal_alpha, gamma=args.focal_gamma)
+    
+    # For combined losses with weights from args
+    return CombinedLoss({
+        'ce': nn.CrossEntropyLoss(),
+        'focal': FocalLoss(gamma=2.0)
+    }, weights={
+        'ce': args.ce_weight,
+        'focal': args.focal_weight
+    })
+```
+
+**Configure loss weights via command line:**
+```bash
+# Single loss with parameters
+python train.py --focal_alpha 1.0 --focal_gamma 2.0
+
+# Combined loss weights
+python train.py --ce_weight 0.7 --focal_weight 0.3
+
+# Multi-task loss weights
+python train.py --classification_weight 1.0 --regression_weight 0.5
+```
+
+#### 2. Implement Your Model (`src/models/model.py`)
+**Core component** - Replace UNet with your architecture
+```python
+class YourModel(BaseModel):
+    def __init__(self, num_classes=10, **kwargs):
+        super().__init__()
+        # Your architecture here
+        self.layers = nn.Sequential(...)
+        self.num_classes = num_classes
+        
+    def init_weights(self):  # REQUIRED
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight)
+    
+    @property
+    def dim(self):  # REQUIRED
+        return self.num_classes
+    
+    def forward(self, x):  # REQUIRED
+        return self.layers(x)
+```
+
+#### 3. Configure Data Pipeline (`src/data/`)
+**Customize for your dataset**
+
+**`dataset.py`** - Define your data loading:
+```python
+# Modify BaseDataset or create CustomDataset
+class YourDataset(BaseDataset):
+    def __init__(self, data_path, transform=None, **kwargs):
+        # Load your data paths and labels
+        image_paths = self.load_data_paths(data_path)
+        super().__init__(image_paths, transform, **kwargs)
+```
+
+**`loader.py`** - Adjust data loading parameters
+
+#### 4. Customize Training Logic (`src/trainer/main_trainer.py`) 
+**Optional** - Only if you need custom training loops
+```python
+class MainTrainer(BaseTrainer):
+    # Loss is automatically loaded from src/utils/loss.py
+    
+    def train_epoch(self, train_loader):  # Override if needed
+        # Custom training logic
+        return {'loss': avg_loss, 'accuracy': accuracy}
+    
+    def validate_epoch(self, val_loader):  # Override if needed
+        # Custom validation logic
+        return {'val_loss': avg_loss, 'val_accuracy': accuracy}
+```
+
+#### 5. Update Arguments (`arguments.py`)
+**Configure hyperparameters** for your specific task:
+```python
+# Modify model-specific arguments
+parser.add_argument('--model', default='your_model')
+
+# ... rest of code
+```
+
+#### 6. Update Training Entry (`train.py`)
+**Connect your model** to the training pipeline:
+```python
+def main():
+    args = parse_arguments()
+    
+    if args.model == 'your_model':
+        model = YourModel(
+            num_classes=args.num_classes,
+            input_channels=args.input_channels
+        )
+    # ... rest of training code
+```
+
+
+
+### Essential Modifications Summary
+
+| Component | File | What to Modify |
+|-----------|------|----------------|
+| **Loss Function** | `src/utils/loss.py` | `get_loss_function()` - Define your training objective |
+| **Model Architecture** | `src/models/model.py` | Replace UNet, implement required methods |
+| **Dataset** | `src/data/dataset.py` | Customize data loading for your data format |
+| **Hyperparameters** | `arguments.py` | Add model/task-specific arguments |
+| **Training Entry** | `train.py` | Connect your model to training pipeline |
+| **Training Logic** | `src/trainer/main_trainer.py` | *(Optional)* Custom training loops |
 
 ## 🛠️ Implementation
 

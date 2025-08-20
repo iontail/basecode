@@ -3,6 +3,14 @@ import torch.nn as nn
 from src.trainer.base_trainer import BaseTrainer
 from typing import Any, Dict, Optional, Tuple, Union
 
+# Import user-defined loss function
+try:
+    from src.utils.loss import get_loss_function
+    CUSTOM_LOSS_AVAILABLE = True
+except ImportError:
+    CUSTOM_LOSS_AVAILABLE = False
+    print("Warning: src/utils/loss.py not found or get_loss_function() not defined. Using default loss.")
+
 
 class MainTrainer(BaseTrainer):
     """
@@ -40,10 +48,20 @@ class MainTrainer(BaseTrainer):
     def get_criterion(self):
         """
         Return the loss criteria for training
+        Gets loss function from loss.py if available, otherwise uses default
         Returns:
-            - Single loss function for classification tasks
+            - Loss function(s) defined in loss.py or default CrossEntropyLoss
         """
-        return nn.CrossEntropyLoss(label_smoothing=self.args.label_smoothing)
+        if CUSTOM_LOSS_AVAILABLE:
+            try:
+                return get_loss_function(self.args)
+            except Exception as e:
+                print(f"Error loading custom loss function: {e}")
+                print("Falling back to default CrossEntropyLoss")
+        
+        # Default fallback loss
+        label_smoothing = getattr(self.args, 'label_smoothing', 0.0)
+        return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
     
     def train_epoch(self, train_loader) -> Dict[str, float]:
         """
@@ -53,15 +71,19 @@ class MainTrainer(BaseTrainer):
         Returns:
             - metrics: dictionary of training metrics (e.g., {'loss': loss_value})
         """
+        self.model.train()
+        total_loss = 0.0
+        num_batches = 0
         
-        """
-        Example implementation:
-
         for batch in train_loader:
-            loss, predictions = self.forward_pass(batch)
-            ...
-        """
-        pass
+            loss, _ = self.forward_pass(batch)
+            
+            self.mixed_precision_step(loss)
+            
+            total_loss += loss.item()
+            num_batches += 1
+        
+        return {'loss': total_loss / num_batches if num_batches > 0 else 0.0}
     
     def validate_epoch(self, val_loader) -> Dict[str, float]:
         """
@@ -71,7 +93,20 @@ class MainTrainer(BaseTrainer):
         Returns:
             - metrics: dictionary of validation metrics (e.g., {'val_loss': loss_value})
         """
-        pass
+        if val_loader is None:
+            return {}
+            
+        self.model.eval()
+        total_loss = 0.0
+        num_batches = 0
+        
+        with torch.no_grad():
+            for batch in val_loader:
+                loss, _ = self.forward_pass(batch)
+                total_loss += loss.item()
+                num_batches += 1
+        
+        return {'val_loss': total_loss / num_batches if num_batches > 0 else 0.0}
     
     def forward_pass(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -81,7 +116,17 @@ class MainTrainer(BaseTrainer):
         Returns:
             - tuple: (loss, predictions)
         """
-        pass
+        # Move batch to device
+        images = batch['image'].to(self.device)
+        labels = batch['label'].to(self.device)
+        
+        # Forward pass
+        predictions = self.model(images)
+        
+        # Compute loss
+        loss = self.criteria(predictions, labels)
+        
+        return loss, predictions
     
     def inference(self, batch) -> torch.Tensor:
         """
@@ -91,4 +136,8 @@ class MainTrainer(BaseTrainer):
         Returns:
             - predictions: model predictions
         """
-        pass
+        self.model.eval()
+        with torch.no_grad():
+            images = batch['image'].to(self.device)
+            predictions = self.model(images)
+        return predictions
